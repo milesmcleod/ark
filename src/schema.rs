@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -9,7 +9,9 @@ use crate::error::ArkError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     pub name: String,
+    #[serde(default)]
     pub directory: String,
+    #[serde(default)]
     pub prefix: String,
     #[serde(default)]
     pub fields: Vec<FieldDef>,
@@ -17,6 +19,10 @@ pub struct Schema {
     pub archive: Option<ArchiveDef>,
     #[serde(default)]
     pub template: Option<String>,
+    #[serde(default)]
+    pub extends: Option<String>,
+    #[serde(default)]
+    pub registry: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +158,114 @@ pub fn find_ark_root(start: &Path) -> Result<PathBuf> {
     Err(ArkError::NotInitialized.into())
 }
 
+/// Resolve schema inheritance by merging base fields into children.
+/// Child schemas can override fields (by name), directory, prefix, archive, and template.
+/// Circular inheritance is detected and returns an error.
+fn resolve_inheritance(schemas: &mut HashMap<String, Schema>) -> Result<()> {
+    // Collect which schemas extend others
+    let extends_map: HashMap<String, String> = schemas
+        .iter()
+        .filter_map(|(name, schema)| {
+            schema
+                .extends
+                .as_ref()
+                .map(|base| (name.clone(), base.clone()))
+        })
+        .collect();
+
+    // Detect circular inheritance
+    for start in extends_map.keys() {
+        let mut visited = HashSet::new();
+        let mut current = start.as_str();
+        while let Some(base) = extends_map.get(current) {
+            if !visited.insert(current.to_string()) {
+                anyhow::bail!(
+                    "circular schema inheritance detected: '{}' is part of an inheritance cycle",
+                    start
+                );
+            }
+            current = base.as_str();
+        }
+    }
+
+    // Resolve in topological order - process schemas whose bases are already resolved
+    let mut resolved: HashSet<String> = schemas
+        .keys()
+        .filter(|name| !extends_map.contains_key(name.as_str()))
+        .cloned()
+        .collect();
+
+    let mut pending: Vec<String> = extends_map.keys().cloned().collect();
+
+    while !pending.is_empty() {
+        let mut progress = false;
+        let mut still_pending = Vec::new();
+
+        for name in pending {
+            let base_name = extends_map.get(&name).unwrap();
+            if resolved.contains(base_name) {
+                // Resolve this schema
+                let base = schemas.get(base_name).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "schema '{}' extends '{}', but '{}' was not found",
+                        name,
+                        base_name,
+                        base_name
+                    )
+                })?;
+
+                let base_fields = base.fields.clone();
+                let base_directory = base.directory.clone();
+                let base_prefix = base.prefix.clone();
+                let base_archive = base.archive.clone();
+                let base_template = base.template.clone();
+
+                let child = schemas.get_mut(&name).unwrap();
+
+                // Merge fields: start with base fields, then overlay child fields
+                let child_field_names: HashSet<&str> =
+                    child.fields.iter().map(|f| f.name.as_str()).collect();
+                let mut merged_fields: Vec<FieldDef> = base_fields
+                    .into_iter()
+                    .filter(|f| !child_field_names.contains(f.name.as_str()))
+                    .collect();
+                merged_fields.append(&mut child.fields);
+                child.fields = merged_fields;
+
+                // Inherit directory and prefix if not set by child
+                if child.directory.is_empty() {
+                    child.directory = base_directory;
+                }
+                if child.prefix.is_empty() {
+                    child.prefix = base_prefix;
+                }
+                if child.archive.is_none() {
+                    child.archive = base_archive;
+                }
+                if child.template.is_none() {
+                    child.template = base_template;
+                }
+
+                resolved.insert(name);
+                progress = true;
+            } else {
+                still_pending.push(name);
+            }
+        }
+
+        if !progress {
+            anyhow::bail!(
+                "could not resolve schema inheritance for: {}",
+                still_pending.join(", ")
+            );
+        }
+
+        pending = still_pending;
+    }
+
+    Ok(())
+}
+
 /// Load all schemas from .ark/schemas/
 pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
     let schemas_dir = ark_root.join(".ark").join("schemas");
@@ -185,6 +299,9 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
     if schemas.is_empty() {
         return Err(ArkError::NoSchemas.into());
     }
+
+    // Resolve schema inheritance before validation
+    resolve_inheritance(&mut schemas)?;
 
     // Validate directory containment - no escaping the project root
     for schema in schemas.values() {
@@ -238,12 +355,15 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
 
 /// Load a single schema by artifact type name.
 /// Scans schema files individually to avoid loading all schemas.
+/// If the schema uses `extends`, loads and resolves the base schema too.
 pub fn load_schema(ark_root: &Path, type_name: &str) -> Result<Schema> {
     let schemas_dir = ark_root.join(".ark").join("schemas");
     if !schemas_dir.is_dir() {
         return Err(ArkError::NoSchemas.into());
     }
 
+    // Load all raw schemas from disk into a map so we can resolve inheritance
+    let mut all_schemas = HashMap::new();
     let entries = std::fs::read_dir(&schemas_dir).with_context(|| {
         format!(
             "failed to read schemas directory: {}",
@@ -262,13 +382,54 @@ pub fn load_schema(ark_root: &Path, type_name: &str) -> Result<Schema> {
                     path: path.clone(),
                     message: e.to_string(),
                 })?;
-            if schema.name == type_name {
-                return Ok(schema);
-            }
+            all_schemas.insert(schema.name.clone(), schema);
         }
     }
 
-    Err(ArkError::UnknownType(type_name.to_string()).into())
+    if !all_schemas.contains_key(type_name) {
+        return Err(ArkError::UnknownType(type_name.to_string()).into());
+    }
+
+    // Resolve inheritance for all schemas (needed to resolve chains)
+    resolve_inheritance(&mut all_schemas)?;
+
+    all_schemas
+        .remove(type_name)
+        .ok_or_else(|| ArkError::UnknownType(type_name.to_string()).into())
+}
+
+/// Load all raw schemas from .ark/schemas/ with their registry URLs.
+/// Does NOT resolve inheritance. Used by registry-pull to find URLs.
+pub fn load_schemas_raw(ark_root: &Path) -> Result<Vec<(PathBuf, Schema)>> {
+    let schemas_dir = ark_root.join(".ark").join("schemas");
+    if !schemas_dir.is_dir() {
+        return Err(ArkError::NoSchemas.into());
+    }
+
+    let mut result = Vec::new();
+    let entries = std::fs::read_dir(&schemas_dir).with_context(|| {
+        format!(
+            "failed to read schemas directory: {}",
+            schemas_dir.display()
+        )
+    })?;
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "yml" || e == "yaml") {
+            let content = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read schema: {}", path.display()))?;
+            let schema: Schema =
+                serde_yml::from_str(&content).map_err(|e| ArkError::SchemaError {
+                    path: path.clone(),
+                    message: e.to_string(),
+                })?;
+            result.push((path, schema));
+        }
+    }
+
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -375,5 +536,195 @@ template: |
         let schema = sample_schema();
         assert_eq!(schema.archive_value(), Some("done"));
         assert_eq!(schema.archive_directory(), Some("backlog/done"));
+    }
+
+    #[test]
+    fn test_inheritance_merges_fields() {
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            "base-task".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: base-task
+directory: backlog
+prefix: BL
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, blocked, done]
+    default: backlog
+"#,
+            )
+            .unwrap(),
+        );
+        schemas.insert(
+            "task".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: task
+extends: base-task
+fields:
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: project
+    type: enum
+    required: true
+    values: [alpha, beta]
+"#,
+            )
+            .unwrap(),
+        );
+
+        resolve_inheritance(&mut schemas).unwrap();
+
+        let task = &schemas["task"];
+        // Should have 5 fields: id, title, status from base + priority, project from child
+        assert_eq!(task.fields.len(), 5);
+        assert!(task.get_field("id").is_some());
+        assert!(task.get_field("title").is_some());
+        assert!(task.get_field("status").is_some());
+        assert!(task.get_field("priority").is_some());
+        assert!(task.get_field("project").is_some());
+        // Should inherit directory and prefix from base
+        assert_eq!(task.directory, "backlog");
+        assert_eq!(task.prefix, "BL");
+    }
+
+    #[test]
+    fn test_inheritance_child_overrides_field() {
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            "base-task".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: base-task
+directory: backlog
+prefix: BL
+fields:
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, done]
+"#,
+            )
+            .unwrap(),
+        );
+        schemas.insert(
+            "task".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: task
+extends: base-task
+directory: tasks
+prefix: TK
+fields:
+  - name: status
+    type: enum
+    required: true
+    values: [open, closed]
+"#,
+            )
+            .unwrap(),
+        );
+
+        resolve_inheritance(&mut schemas).unwrap();
+
+        let task = &schemas["task"];
+        // Child's override of status should win
+        let status = task.get_field("status").unwrap();
+        assert_eq!(status.values.as_ref().unwrap(), &["open", "closed"]);
+        // Child overrides directory and prefix
+        assert_eq!(task.directory, "tasks");
+        assert_eq!(task.prefix, "TK");
+    }
+
+    #[test]
+    fn test_inheritance_circular_detection() {
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            "a".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: a
+directory: a
+prefix: A
+extends: b
+fields: []
+"#,
+            )
+            .unwrap(),
+        );
+        schemas.insert(
+            "b".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: b
+directory: b
+prefix: B
+extends: a
+fields: []
+"#,
+            )
+            .unwrap(),
+        );
+
+        let result = resolve_inheritance(&mut schemas);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("circular") || err_msg.contains("could not resolve"),
+            "expected circular inheritance error, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_inheritance_missing_base() {
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            "task".to_string(),
+            serde_yml::from_str::<Schema>(
+                r#"
+name: task
+extends: nonexistent
+fields: []
+"#,
+            )
+            .unwrap(),
+        );
+
+        let result = resolve_inheritance(&mut schemas);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_schema_with_registry_field() {
+        let schema: Schema = serde_yml::from_str(
+            r#"
+name: task
+directory: backlog
+prefix: BL
+registry: https://example.com/task.yml
+fields:
+  - name: id
+    type: string
+    required: true
+"#,
+        )
+        .unwrap();
+        assert_eq!(
+            schema.registry.as_deref(),
+            Some("https://example.com/task.yml")
+        );
     }
 }

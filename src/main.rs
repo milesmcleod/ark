@@ -149,6 +149,11 @@ fn main() -> Result<()> {
             cli::ScanCommand::Lint => commands::scan::run_lint(&cwd),
         },
 
+        Command::RegistryPull => {
+            let root = find_ark_root(&cwd)?;
+            commands::registry_pull::run(&root)
+        }
+
         Command::Completions(args) => commands::completions::run(args.shell),
 
         Command::SchemaHelp => commands::schema_help::run(),

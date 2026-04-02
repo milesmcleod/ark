@@ -10,6 +10,7 @@ pub mod list;
 pub mod new;
 pub mod next;
 pub mod rebalance;
+pub mod registry_pull;
 pub mod relate;
 pub mod scan;
 pub mod schema_help;

@@ -1,8 +1,8 @@
 ---
-id: BL-016
-title: ark stale - detect inactive artifacts via git log
-status: active
-priority: 130
+id: BL-015
+title: ark context - gather related artifacts for an item
+status: done
+priority: 120
 type: feature
 created: 2026-04-02
 updated: 2026-04-02

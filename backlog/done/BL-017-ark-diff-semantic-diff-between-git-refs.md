@@ -1,8 +1,8 @@
 ---
-id: BL-014
-title: ark relate - cross-references in frontmatter
-status: active
-priority: 110
+id: BL-017
+title: ark diff - semantic diff between git refs
+status: done
+priority: 140
 type: feature
 created: 2026-04-02
 updated: 2026-04-02

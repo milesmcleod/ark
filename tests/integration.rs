@@ -1520,3 +1520,221 @@ fn test_context_nonexistent_artifact() {
         .failure()
         .stderr(predicate::str::contains("artifact not found"));
 }
+
+// --- Schema inheritance tests ---
+
+#[test]
+fn test_schema_inheritance_types() {
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let base_schema = r#"name: base-task
+directory: base-backlog
+prefix: BB
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, blocked, done]
+    default: backlog
+"#;
+
+    let child_schema = r#"name: task
+extends: base-task
+directory: backlog
+prefix: BL
+fields:
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: project
+    type: enum
+    required: true
+    values: [alpha, beta]
+"#;
+
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("base-task.yml"), base_schema).unwrap();
+    fs::write(schemas_dir.join("task.yml"), child_schema).unwrap();
+
+    // Both types should show up in ark types
+    ark()
+        .args(["types"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("base-task"))
+        .stdout(predicate::str::contains("task"));
+}
+
+#[test]
+fn test_schema_inheritance_create_artifact() {
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let base_schema = r#"name: base-task
+directory: base-backlog
+prefix: BB
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, blocked, done]
+    default: backlog
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+
+    let child_schema = r#"name: task
+extends: base-task
+directory: backlog
+prefix: BL
+fields:
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: project
+    type: enum
+    required: true
+    values: [alpha, beta]
+"#;
+
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("base-task.yml"), base_schema).unwrap();
+    fs::write(schemas_dir.join("task.yml"), child_schema).unwrap();
+
+    // Create an artifact using the child type - it should have inherited fields
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Inherited task",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // The artifact should have inherited status from base
+    ark()
+        .args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Inherited task"))
+        .stdout(predicate::str::contains("backlog"));
+
+    // Should be able to list artifacts
+    ark()
+        .args(["list", "task"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Inherited task"));
+}
+
+#[test]
+fn test_schema_inheritance_field_override() {
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let base_schema = r#"name: base-item
+directory: items
+prefix: IT
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [open, closed]
+    default: open
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+
+    // Child overrides status values
+    let child_schema = r#"name: ticket
+extends: base-item
+directory: tickets
+prefix: TK
+fields:
+  - name: status
+    type: enum
+    required: true
+    values: [new, triaged, in-progress, resolved]
+    default: new
+"#;
+
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("base-item.yml"), base_schema).unwrap();
+    fs::write(schemas_dir.join("ticket.yml"), child_schema).unwrap();
+
+    // Create a ticket - status should use the overridden values
+    ark()
+        .args(["new", "ticket", "--title", "My ticket"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["show", "TK-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("new"));
+
+    // The base status values (open/closed) should not be valid
+    ark()
+        .args(["edit", "TK-001", "--status", "open"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+// --- Registry pull tests ---
+
+#[test]
+fn test_registry_pull_no_registry_schemas() {
+    let dir = setup_project();
+    ark()
+        .args(["registry-pull"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no schemas with registry URLs"));
+}

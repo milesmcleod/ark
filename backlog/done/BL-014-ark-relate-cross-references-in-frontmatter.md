@@ -1,8 +1,8 @@
 ---
-id: BL-019
-title: Schema registry - remote schema references
-status: active
-priority: 160
+id: BL-014
+title: ark relate - cross-references in frontmatter
+status: done
+priority: 110
 type: feature
 created: 2026-04-02
 updated: 2026-04-02

@@ -74,6 +74,9 @@ pub enum Command {
     /// Scan across nested ark projects (recursive discovery)
     Scan(ScanArgs),
 
+    /// Fetch schemas from their registry URLs
+    RegistryPull,
+
     /// Generate shell completions
     Completions(CompletionsArgs),
 
