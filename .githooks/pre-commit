@@ -3,14 +3,14 @@ set -e
 
 echo "Running pre-commit checks..."
 
-# Format check (fast, catches formatting before clippy)
+# Auto-format and re-stage changed files
 echo "  fmt..."
-cargo fmt -- --check 2>&1 || {
-    echo "Format check failed. Run 'cargo fmt' to fix."
-    exit 1
-}
+cargo fmt 2>&1
+git diff --name-only --diff-filter=M | while read -r file; do
+    case "$file" in *.rs) git add "$file" ;; esac
+done
 
-# Clippy (catches lint issues)
+# Clippy
 echo "  clippy..."
 cargo clippy -- -D warnings 2>&1 || {
     echo "Clippy failed. Fix warnings above."

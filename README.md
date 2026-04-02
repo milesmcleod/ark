@@ -23,8 +23,16 @@ Or build from source:
 ```
 git clone https://github.com/milesmcleod/ark.git
 cd ark
-cargo build --release
-# binary is at target/release/ark
+cargo install --path .
+```
+
+For development:
+
+```
+git clone https://github.com/milesmcleod/ark.git
+cd ark
+git config core.hooksPath .githooks  # activate pre-commit (fmt, clippy, test)
+cargo build
 ```
 
 ## Quick start
