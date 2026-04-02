@@ -138,14 +138,19 @@ impl Schema {
     }
 }
 
-/// Find the ark root by looking for .ark/ in the current directory
+/// Find the ark root by walking up from the current directory
 pub fn find_ark_root(start: &Path) -> Result<PathBuf> {
-    let ark_dir = start.join(".ark");
-    if ark_dir.is_dir() {
-        Ok(start.to_path_buf())
-    } else {
-        Err(ArkError::NotInitialized.into())
+    let mut current = start.to_path_buf();
+    loop {
+        let ark_dir = current.join(".ark");
+        if ark_dir.is_dir() {
+            return Ok(current)
+        }
+        if !current.pop() {
+            break;
+        }
     }
+    Err(ArkError::NotInitialized.into())
 }
 
 /// Load all schemas from .ark/schemas/

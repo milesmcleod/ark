@@ -1,7 +1,7 @@
 ---
 id: BL-007
 title: Parent directory walk for .ark/ discovery
-status: backlog
+status: active
 priority: 25
 type: feature
 created: 2026-04-02

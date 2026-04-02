@@ -6,7 +6,8 @@ use chrono::Local;
 use crate::artifact::load_artifacts;
 use crate::cli::EditArgs;
 use crate::error::ArkError;
-use crate::schema::{load_schemas, FieldType};
+use crate::schema::load_schemas;
+use crate::validate::validate_field_value;
 
 pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
     let schemas = load_schemas(ark_root)?;
@@ -23,42 +24,60 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
 
         if let Some(artifact) = artifact {
             let mut updated = artifact.clone();
+            let mut changed = false;
 
             // Apply named field updates
             if let Some(ref status) = args.status {
-                validate_enum(&schema, "status", status)?;
+                validate_field_value(schema, "status", status)?;
                 updated
                     .frontmatter
                     .insert("status".into(), serde_json::Value::String(status.clone()));
+                changed = true;
             }
             if let Some(priority) = args.priority {
+                // Validate unique priority (excluding self)
+                crate::validate::validate_unique_priority(&artifacts, priority, Some(id))?;
                 updated
                     .frontmatter
                     .insert("priority".into(), serde_json::json!(priority));
+                changed = true;
             }
             if let Some(ref title) = args.title {
+                if title.trim().is_empty() {
+                    anyhow::bail!("title cannot be empty");
+                }
                 updated
                     .frontmatter
                     .insert("title".into(), serde_json::Value::String(title.clone()));
+                changed = true;
             }
             if let Some(ref project) = args.project {
-                validate_enum(&schema, "project", project)?;
+                validate_field_value(schema, "project", project)?;
                 updated
                     .frontmatter
                     .insert("project".into(), serde_json::Value::String(project.clone()));
+                changed = true;
             }
             if let Some(ref item_type) = args.kind {
-                validate_enum(&schema, "type", item_type)?;
+                validate_field_value(schema, "type", item_type)?;
                 updated
                     .frontmatter
                     .insert("type".into(), serde_json::Value::String(item_type.clone()));
+                changed = true;
             }
 
-            // Apply --set key=value fields
+            // Apply --set key=value fields (validated against schema)
             for (key, value) in &args.fields {
+                validate_field_value(schema, key, value)?;
                 updated
                     .frontmatter
                     .insert(key.clone(), serde_json::Value::String(value.clone()));
+                changed = true;
+            }
+
+            if !changed {
+                println!("No changes to {}.", id);
+                return Ok(());
             }
 
             // Update the updated date
@@ -77,26 +96,4 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
     }
 
     Err(ArkError::ArtifactNotFound(id.to_string()).into())
-}
-
-fn validate_enum(
-    schema: &crate::schema::Schema,
-    field_name: &str,
-    value: &str,
-) -> Result<()> {
-    if let Some(field) = schema.get_field(field_name) {
-        if field.field_type == FieldType::Enum {
-            if let Some(ref values) = field.values {
-                if !values.contains(&value.to_string()) {
-                    anyhow::bail!(
-                        "invalid value '{}' for field '{}'. Valid values: {}",
-                        value,
-                        field_name,
-                        values.join(", ")
-                    );
-                }
-            }
-        }
-    }
-    Ok(())
 }

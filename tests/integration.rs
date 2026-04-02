@@ -397,3 +397,196 @@ fn test_rebalance() {
         .stdout(predicate::str::contains("10"))
         .stdout(predicate::str::contains("20"));
 }
+
+#[test]
+fn test_new_rejects_missing_required_fields() {
+    let dir = setup_project();
+    // Missing --project which is required
+    ark().args([
+            "new", "task",
+            "--title", "Incomplete task",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing required fields"));
+}
+
+#[test]
+fn test_new_rejects_duplicate_priority() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "First task",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark().args([
+            "new", "task",
+            "--title", "Dupe priority",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("priority 10 is already used"));
+}
+
+#[test]
+fn test_set_validates_against_schema() {
+    let dir = setup_project();
+    // --set on a derived field should fail
+    ark().args([
+            "new", "task",
+            "--title", "Test set validation",
+            "--project", "alpha",
+            "--priority", "10",
+            "--set", "id=FAKE-999",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("derived"));
+}
+
+#[test]
+fn test_edit_noop_no_changes() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "No-op test",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark().args(["edit", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No changes"));
+}
+
+#[test]
+fn test_parent_directory_walk() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "Walk test",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Create a subdirectory and run from there
+    let subdir = dir.path().join("subdir");
+    fs::create_dir(&subdir).unwrap();
+
+    ark().args(["list", "task"])
+        .current_dir(&subdir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Walk test"));
+}
+
+#[test]
+fn test_colon_in_title_roundtrip() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "Fix: colon handling",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Verify it survives a show
+    ark().args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fix: colon handling"));
+
+    // Edit and verify it still survives
+    ark().args(["edit", "BL-001", "--status", "active"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark().args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fix: colon handling"));
+}
+
+#[test]
+fn test_next_command() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "Active item",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark().args([
+            "new", "task",
+            "--title", "Queued item",
+            "--project", "alpha",
+            "--priority", "20",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark().args(["edit", "BL-001", "--status", "active"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark().args(["next", "task"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Active:"))
+        .stdout(predicate::str::contains("Up next:"));
+}
+
+#[test]
+fn test_show_json_format() {
+    let dir = setup_project();
+    ark().args([
+            "new", "task",
+            "--title", "JSON test",
+            "--project", "alpha",
+            "--priority", "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let output = ark()
+        .args(["-F", "json", "show", "BL-001"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed["title"], "JSON test");
+    assert_eq!(parsed["id"], "BL-001");
+}

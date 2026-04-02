@@ -4,6 +4,7 @@ mod commands;
 mod error;
 mod output;
 mod schema;
+mod validate;
 
 use anyhow::Result;
 use clap::Parser;

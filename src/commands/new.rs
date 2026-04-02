@@ -5,7 +5,8 @@ use chrono::Local;
 
 use crate::artifact::{load_artifacts, next_id, slugify, Artifact};
 use crate::cli::NewArgs;
-use crate::schema::{load_schema, FieldType};
+use crate::schema::load_schema;
+use crate::validate::{validate_field_value, validate_required_fields, validate_unique_priority};
 
 pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     let schema = load_schema(ark_root, &args.artifact_type)?;
@@ -31,7 +32,7 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
 
     // Set status from args or schema default
     if let Some(ref status) = args.status {
-        validate_enum_field(&schema, "status", status)?;
+        validate_field_value(&schema, "status", status)?;
         frontmatter.insert("status".into(), serde_json::Value::String(status.clone()));
     } else if let Some(field) = schema.get_field("status") {
         if let Some(ref default) = field.default {
@@ -41,18 +42,19 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
 
     // Set priority
     if let Some(priority) = args.priority {
+        validate_unique_priority(&existing, priority, None)?;
         frontmatter.insert("priority".into(), serde_json::json!(priority));
     }
 
     // Set project
     if let Some(ref project) = args.project {
-        validate_enum_field(&schema, "project", project)?;
+        validate_field_value(&schema, "project", project)?;
         frontmatter.insert("project".into(), serde_json::Value::String(project.clone()));
     }
 
-    // Set type
+    // Set type (via --kind flag)
     if let Some(ref item_type) = args.kind {
-        validate_enum_field(&schema, "type", item_type)?;
+        validate_field_value(&schema, "type", item_type)?;
         frontmatter.insert(
             "type".into(),
             serde_json::Value::String(item_type.clone()),
@@ -71,9 +73,10 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
         );
     }
 
-    // Set extra fields
+    // Set extra fields (validated against schema)
     if let Some(ref extras) = args.extra_fields {
         for (key, value) in extras {
+            validate_field_value(&schema, key, value)?;
             frontmatter.insert(key.clone(), serde_json::Value::String(value.clone()));
         }
     }
@@ -81,6 +84,9 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     // Set derived dates
     frontmatter.insert("created".into(), serde_json::Value::String(today.clone()));
     frontmatter.insert("updated".into(), serde_json::Value::String(today));
+
+    // Validate all required fields are present
+    validate_required_fields(&schema, &frontmatter)?;
 
     // Build body from template
     let body = schema
@@ -90,7 +96,7 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
         .unwrap_or_else(|| "\n".to_string());
 
     let artifact = Artifact {
-        path: std::path::PathBuf::new(), // will be set below
+        path: std::path::PathBuf::new(),
         frontmatter,
         body,
         raw: String::new(),
@@ -109,23 +115,5 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
 
     println!("Created {} at {}", id, filepath.display());
 
-    Ok(())
-}
-
-fn validate_enum_field(schema: &crate::schema::Schema, field_name: &str, value: &str) -> Result<()> {
-    if let Some(field) = schema.get_field(field_name) {
-        if field.field_type == FieldType::Enum {
-            if let Some(ref values) = field.values {
-                if !values.contains(&value.to_string()) {
-                    bail!(
-                        "invalid value '{}' for field '{}'. Valid values: {}",
-                        value,
-                        field_name,
-                        values.join(", ")
-                    );
-                }
-            }
-        }
-    }
     Ok(())
 }
