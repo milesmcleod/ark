@@ -299,7 +299,7 @@ id: BL-001
 title: Build prototype
 status: active
 priority: 10
-tags: [hardware, bellflower]
+tags: [backend, api]
 created: 2026-04-01
 ---
 
@@ -312,7 +312,7 @@ This is the body.
         assert_eq!(artifact.title(), Some("Build prototype"));
         assert_eq!(artifact.status(), Some("active"));
         assert_eq!(artifact.priority(), Some(10));
-        assert_eq!(artifact.get_list("tags"), vec!["hardware", "bellflower"]);
+        assert_eq!(artifact.get_list("tags"), vec!["backend", "api"]);
         assert!(artifact.body.contains("This is the body."));
     }
 
@@ -326,10 +326,7 @@ This is the body.
 
     #[test]
     fn test_slugify() {
-        assert_eq!(
-            slugify("Build Bellflower Prototype"),
-            "build-bellflower-prototype"
-        );
+        assert_eq!(slugify("Build User Dashboard"), "build-user-dashboard");
         assert_eq!(slugify("Fix bug #42"), "fix-bug-42");
         assert_eq!(slugify("  lots   of   spaces  "), "lots-of-spaces");
     }
