@@ -19,7 +19,20 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
             continue;
         }
 
-        let artifacts = load_artifacts(ark_root, schema)?;
+        let mut artifacts = load_artifacts(ark_root, schema)?;
+        // Also check archive directory
+        if let Some(archive_dir) = schema.archive_directory() {
+            let archive_path = ark_root.join(archive_dir);
+            if archive_path.is_dir() {
+                let archive_schema = crate::schema::Schema {
+                    directory: archive_dir.to_string(),
+                    ..schema.clone()
+                };
+                if let Ok(archived) = load_artifacts(ark_root, &archive_schema) {
+                    artifacts.extend(archived);
+                }
+            }
+        }
         let artifact = artifacts.iter().find(|a| a.id() == Some(id.as_str()));
 
         if let Some(artifact) = artifact {

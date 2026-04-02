@@ -1726,6 +1726,143 @@ fields:
         .stderr(predicate::str::contains("invalid value"));
 }
 
+// --- BL fixes tests ---
+
+#[test]
+fn test_filter_warns_invalid_enum() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Filtering by invalid status should warn on stderr
+    ark()
+        .args(["list", "task", "--status", "nonexistent"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not a known value"));
+}
+
+#[test]
+fn test_case_insensitive_search() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "UPPERCASE title",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Case sensitive (default) should not match lowercase
+    ark()
+        .args(["search", "uppercase"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No artifacts matching"));
+
+    // Case insensitive should match
+    ark()
+        .args(["search", "-i", "uppercase"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("BL-001"));
+}
+
+#[test]
+fn test_edit_archived_item() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "To archive",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["edit", "BL-001", "--status", "done"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["archive", "task"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Should be able to edit the archived item (e.g. reopen it)
+    ark()
+        .args(["edit", "BL-001", "--status", "active"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Updated BL-001"));
+}
+
+#[test]
+fn test_set_conflict_detection() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // --status and --set status should conflict
+    ark()
+        .args([
+            "edit",
+            "BL-001",
+            "--status",
+            "active",
+            "--set",
+            "status=done",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("conflict"));
+}
+
 // --- Registry pull tests ---
 
 #[test]

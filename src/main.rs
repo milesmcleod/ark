@@ -117,6 +117,7 @@ fn main() -> Result<()> {
                 &root,
                 &args.pattern,
                 args.artifact_type.as_deref(),
+                args.ignore_case,
                 &cli.format,
             )
         }
@@ -144,6 +145,7 @@ fn main() -> Result<()> {
                 &cwd,
                 &scan_args.pattern,
                 scan_args.types.as_deref(),
+                scan_args.ignore_case,
                 &cli.format,
             ),
             cli::ScanCommand::Lint => commands::scan::run_lint(&cwd),

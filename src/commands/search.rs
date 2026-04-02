@@ -10,10 +10,16 @@ pub fn run(
     ark_root: &Path,
     pattern: &str,
     artifact_type: Option<&str>,
+    ignore_case: bool,
     format: &OutputFormat,
 ) -> Result<()> {
-    let re =
-        regex::Regex::new(pattern).map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
+    let effective_pattern = if ignore_case {
+        format!("(?i){}", pattern)
+    } else {
+        pattern.to_string()
+    };
+    let re = regex::Regex::new(&effective_pattern)
+        .map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
 
     let schemas = if let Some(type_name) = artifact_type {
         let schema = load_schema(ark_root, type_name)?;

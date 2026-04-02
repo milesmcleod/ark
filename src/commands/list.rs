@@ -18,16 +18,17 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
         artifacts.retain(|a| a.status() != Some(archive_value));
     }
 
-    // Apply filters
+    // Apply filters (with enum validation warnings)
     if let Some(ref status) = args.status {
+        warn_invalid_enum(&schema, "status", status);
         artifacts.retain(|a| a.status() == Some(status.as_str()));
     }
     if let Some(ref project) = args.project {
+        warn_invalid_enum(&schema, "project", project);
         artifacts.retain(|a| a.get_str("project") == Some(project.as_str()));
     }
     if let Some(ref kind) = args.kind {
-        // Filter by the 'kind' flag which maps to whatever enum-like field
-        // the user intends. Check common field names.
+        warn_invalid_enum(&schema, "type", kind);
         artifacts.retain(|a| {
             a.get_str("type") == Some(kind.as_str()) || a.get_str("kind") == Some(kind.as_str())
         });
@@ -100,4 +101,19 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
     println!("{}", render_table(&header_refs, rows, format));
 
     Ok(())
+}
+
+/// Warn on stderr if a filter value isn't in the schema's enum values for that field
+fn warn_invalid_enum(schema: &crate::schema::Schema, field_name: &str, value: &str) {
+    if let Some(field) = schema.get_field(field_name)
+        && let Some(ref values) = field.values
+        && !values.contains(&value.to_string())
+    {
+        eprintln!(
+            "  warning: '{}' is not a known value for '{}'. Valid values: {}",
+            value,
+            field_name,
+            values.join(", ")
+        );
+    }
 }

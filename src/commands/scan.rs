@@ -286,10 +286,16 @@ pub fn run_search(
     cwd: &Path,
     pattern: &str,
     type_filter: Option<&str>,
+    ignore_case: bool,
     format: &OutputFormat,
 ) -> Result<()> {
-    let re =
-        regex::Regex::new(pattern).map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
+    let effective_pattern = if ignore_case {
+        format!("(?i){}", pattern)
+    } else {
+        pattern.to_string()
+    };
+    let re = regex::Regex::new(&effective_pattern)
+        .map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
 
     let projects = discover_projects(cwd)?;
     let project_count = projects.len();

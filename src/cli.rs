@@ -249,6 +249,10 @@ pub struct SearchArgs {
     /// Restrict to artifact type
     #[arg(long)]
     pub artifact_type: Option<String>,
+
+    /// Case-insensitive search
+    #[arg(short = 'i', long)]
+    pub ignore_case: bool,
 }
 
 #[derive(clap::Args)]
@@ -372,6 +376,10 @@ pub struct ScanSearchArgs {
     /// Restrict to artifact type(s), comma-separated
     #[arg(long)]
     pub types: Option<String>,
+
+    /// Case-insensitive search
+    #[arg(short = 'i', long)]
+    pub ignore_case: bool,
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
