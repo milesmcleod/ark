@@ -1,0 +1,43 @@
+name: task
+directory: backlog
+prefix: BL
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+    pattern: "^BL-\\d{3}$"
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, blocked, done]
+    default: backlog
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: type
+    type: enum
+    required: true
+    values: [feature, bug, chore, research]
+  - name: tags
+    type: list
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+archive:
+  field: status
+  value: done
+  directory: backlog/done
+template: |
+  ## Context
+
+  ## Acceptance criteria
+
+  - [ ]
