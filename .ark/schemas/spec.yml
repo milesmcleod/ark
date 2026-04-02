@@ -6,7 +6,7 @@ fields:
     type: string
     required: true
     derived: true
-    pattern: "^SPEC-\\d{3}$"
+    pattern: "^SPEC-\\d{3,}$"
   - name: title
     type: string
     required: true
@@ -15,6 +15,9 @@ fields:
     required: true
     values: [draft, active, deprecated]
     default: draft
+  - name: date
+    type: date
+    required: true
   - name: tags
     type: list
   - name: created
