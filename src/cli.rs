@@ -26,6 +26,9 @@ pub enum Command {
     /// List artifacts of a given type
     List(ListArgs),
 
+    /// Show the highest priority backlog items
+    Next(NextArgs),
+
     /// Show a single artifact by ID
     Show(ShowArgs),
 
@@ -192,6 +195,16 @@ pub struct FieldsArgs {
 
     /// Specific field to show values for (shows all fields if omitted)
     pub field: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct NextArgs {
+    /// Artifact type
+    pub artifact_type: String,
+
+    /// Number of items to show (default: 5)
+    #[arg(default_value = "5")]
+    pub count: usize,
 }
 
 #[derive(clap::Args)]

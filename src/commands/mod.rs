@@ -6,6 +6,7 @@ pub mod init;
 pub mod lint;
 pub mod list;
 pub mod new;
+pub mod next;
 pub mod rebalance;
 pub mod schema_help;
 pub mod search;

@@ -33,6 +33,11 @@ fn main() -> Result<()> {
             commands::list::run(&root, args, &cli.format)
         }
 
+        Command::Next(args) => {
+            let root = find_ark_root(&cwd)?;
+            commands::next::run(&root, &args.artifact_type, args.count, &cli.format)
+        }
+
         Command::Show(args) => {
             let root = find_ark_root(&cwd)?;
             commands::show::run(&root, &args.id)

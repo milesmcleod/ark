@@ -31,6 +31,18 @@ Format
     ## Section
     Content here.
 
+CLI Flag Mapping
+----------------
+
+  Some schema field names map to different CLI flags:
+    title    -> --title
+    status   -> --status
+    priority -> --priority
+    project  -> --project
+    type     -> --kind    (--type conflicts with clap, use --kind)
+
+  For any other field, use --set key=value.
+
 Field Types
 -----------
 
