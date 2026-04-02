@@ -29,7 +29,7 @@ pub fn run(ark_root: &Path) -> Result<()> {
             Ok(content) => {
                 // Validate that the fetched content is valid YAML and a valid schema
                 match serde_yml::from_str::<crate::schema::Schema>(&content) {
-                    Ok(fetched) => {
+                    Ok(mut fetched) => {
                         if fetched.name != schema.name {
                             eprintln!(
                                 "warning: fetched schema name '{}' does not match local name '{}', skipping",
@@ -38,7 +38,12 @@ pub fn run(ark_root: &Path) -> Result<()> {
                             errors += 1;
                             continue;
                         }
-                        std::fs::write(path, &content).with_context(|| {
+                        // Preserve the registry URL in the fetched schema
+                        fetched.registry = schema.registry.clone();
+                        let output = serde_yml::to_string(&fetched).with_context(|| {
+                            format!("failed to serialize schema: {}", schema.name)
+                        })?;
+                        std::fs::write(path, &output).with_context(|| {
                             format!("failed to write schema: {}", path.display())
                         })?;
                         eprintln!("ok");

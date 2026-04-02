@@ -2,31 +2,66 @@ name: base-task
 directory: backlog
 prefix: BL
 fields:
-  - name: id
-    type: string
-    required: true
-    derived: true
-    pattern: "^BL-\\d{3,}$"
-  - name: title
-    type: string
-    required: true
-  - name: status
-    type: enum
-    required: true
-    values: [backlog, active, blocked, done]
-    default: backlog
-  - name: priority
-    type: integer
-    required: true
-    unique: true
-  - name: tags
-    type: list
-  - name: created
-    type: date
-    derived: true
-  - name: updated
-    type: date
-    derived: true
+- name: id
+  type: string
+  required: true
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: ^BL-\d{3,}$
+- name: title
+  type: string
+  required: true
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: status
+  type: enum
+  required: true
+  unique: false
+  derived: false
+  default: backlog
+  values:
+  - backlog
+  - active
+  - blocked
+  - done
+  pattern: null
+- name: priority
+  type: integer
+  required: true
+  unique: true
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: tags
+  type: list
+  required: false
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: created
+  type: date
+  required: false
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: null
+- name: updated
+  type: date
+  required: false
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: null
 archive:
   field: status
   value: done
@@ -37,3 +72,5 @@ template: |
   ## Acceptance criteria
 
   - [ ]
+extends: null
+registry: https://raw.githubusercontent.com/milesmcleod/ark-schemas/main/base-task.yml
