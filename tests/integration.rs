@@ -727,3 +727,203 @@ fn test_show_json_format() {
     assert_eq!(parsed["title"], "JSON test");
     assert_eq!(parsed["id"], "BL-001");
 }
+
+// --- Scan tests ---
+
+fn setup_multi_project() -> TempDir {
+    let root = TempDir::new().unwrap();
+
+    // Project A: has tasks
+    let proj_a = root.path().join("project-a");
+    fs::create_dir(&proj_a).unwrap();
+    ark().arg("init").current_dir(&proj_a).assert().success();
+    fs::write(
+        proj_a.join(".ark/schemas/task.yml"),
+        r#"name: task
+directory: backlog
+prefix: BL
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, done]
+    default: backlog
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+archive:
+  field: status
+  value: done
+  directory: backlog/done
+"#,
+    )
+    .unwrap();
+    ark()
+        .args(["new", "task", "--title", "Task in A", "--priority", "10"])
+        .current_dir(&proj_a)
+        .assert()
+        .success();
+
+    // Project B: has specs (different type, same ecosystem)
+    let proj_b = root.path().join("project-b");
+    fs::create_dir(&proj_b).unwrap();
+    ark().arg("init").current_dir(&proj_b).assert().success();
+    fs::write(
+        proj_b.join(".ark/schemas/spec.yml"),
+        r#"name: spec
+directory: spec
+prefix: SPEC
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [draft, active]
+    default: draft
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#,
+    )
+    .unwrap();
+    ark()
+        .args(["new", "spec", "--title", "Spec in B"])
+        .current_dir(&proj_b)
+        .assert()
+        .success();
+
+    // Project C: also has tasks (different schema, aliasing test)
+    let proj_c = root.path().join("project-c");
+    fs::create_dir(&proj_c).unwrap();
+    ark().arg("init").current_dir(&proj_c).assert().success();
+    fs::write(
+        proj_c.join(".ark/schemas/task.yml"),
+        r#"name: task
+directory: backlog
+prefix: TK
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [todo, doing, done]
+    default: todo
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#,
+    )
+    .unwrap();
+    ark()
+        .args(["new", "task", "--title", "Task in C"])
+        .current_dir(&proj_c)
+        .assert()
+        .success();
+
+    root
+}
+
+#[test]
+fn test_scan_types_discovers_all_projects() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "types"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("project-a"))
+        .stdout(predicate::str::contains("project-b"))
+        .stdout(predicate::str::contains("project-c"));
+}
+
+#[test]
+fn test_scan_list_aggregates_across_projects() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "list", "task"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Task in A"))
+        .stdout(predicate::str::contains("Task in C"));
+}
+
+#[test]
+fn test_scan_list_filters_by_project() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "list", "task", "--project", "project-a"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Task in A"))
+        .stdout(predicate::str::contains("Task in C").not());
+}
+
+#[test]
+fn test_scan_stats_shows_all() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "stats"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("project-a"))
+        .stdout(predicate::str::contains("project-b"))
+        .stdout(predicate::str::contains("project-c"));
+}
+
+#[test]
+fn test_scan_search_finds_across_projects() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "search", "Task"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("project-a"))
+        .stdout(predicate::str::contains("project-c"));
+}
+
+#[test]
+fn test_scan_lint_validates_all() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "lint"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3 projects"));
+}

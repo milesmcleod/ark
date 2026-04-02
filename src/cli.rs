@@ -59,6 +59,9 @@ pub enum Command {
     /// Search artifact bodies for a pattern
     Search(SearchArgs),
 
+    /// Scan across nested ark projects (recursive discovery)
+    Scan(ScanArgs),
+
     /// Generate shell completions
     Completions(CompletionsArgs),
 
@@ -231,6 +234,68 @@ pub struct SearchArgs {
 pub struct CompletionsArgs {
     /// Shell to generate completions for
     pub shell: clap_complete::Shell,
+}
+
+#[derive(clap::Args)]
+pub struct ScanArgs {
+    #[command(subcommand)]
+    pub command: ScanCommand,
+}
+
+#[derive(Subcommand)]
+pub enum ScanCommand {
+    /// List all artifact types across nested projects
+    Types,
+
+    /// List artifacts of matching types across all projects
+    List(ScanListArgs),
+
+    /// Show aggregate statistics across all projects
+    Stats(ScanStatsArgs),
+
+    /// Search artifact bodies across all projects
+    Search(ScanSearchArgs),
+
+    /// Lint all artifacts across all projects
+    Lint,
+}
+
+#[derive(clap::Args)]
+pub struct ScanListArgs {
+    /// Artifact type(s) to match, comma-separated (e.g. "task,story,ticket")
+    pub types: String,
+
+    /// Filter by status
+    #[arg(long)]
+    pub status: Option<String>,
+
+    /// Filter by project name
+    #[arg(long)]
+    pub project: Option<String>,
+
+    /// Maximum number of items
+    #[arg(long, short = 'n')]
+    pub limit: Option<usize>,
+}
+
+#[derive(clap::Args)]
+pub struct ScanStatsArgs {
+    /// Artifact type(s) to filter (shows all if omitted)
+    pub types: Option<String>,
+
+    /// Group by this field
+    #[arg(long)]
+    pub by: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct ScanSearchArgs {
+    /// Search pattern (regex)
+    pub pattern: String,
+
+    /// Restrict to artifact type(s), comma-separated
+    #[arg(long)]
+    pub types: Option<String>,
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {

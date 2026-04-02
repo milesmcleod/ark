@@ -1,6 +1,7 @@
 mod artifact;
 mod cli;
 mod commands;
+mod discover;
 mod error;
 mod lock;
 mod output;
@@ -94,6 +95,31 @@ fn main() -> Result<()> {
                 &cli.format,
             )
         }
+
+        Command::Scan(args) => match &args.command {
+            cli::ScanCommand::Types => commands::scan::run_types(&cwd, &cli.format),
+            cli::ScanCommand::List(scan_args) => commands::scan::run_list(
+                &cwd,
+                &scan_args.types,
+                scan_args.status.as_deref(),
+                scan_args.project.as_deref(),
+                scan_args.limit,
+                &cli.format,
+            ),
+            cli::ScanCommand::Stats(scan_args) => commands::scan::run_stats(
+                &cwd,
+                scan_args.types.as_deref(),
+                scan_args.by.as_deref(),
+                &cli.format,
+            ),
+            cli::ScanCommand::Search(scan_args) => commands::scan::run_search(
+                &cwd,
+                &scan_args.pattern,
+                scan_args.types.as_deref(),
+                &cli.format,
+            ),
+            cli::ScanCommand::Lint => commands::scan::run_lint(&cwd),
+        },
 
         Command::Completions(args) => commands::completions::run(args.shell),
 

@@ -8,6 +8,7 @@ pub mod list;
 pub mod new;
 pub mod next;
 pub mod rebalance;
+pub mod scan;
 pub mod schema_help;
 pub mod search;
 pub mod show;
