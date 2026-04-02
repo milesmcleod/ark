@@ -86,6 +86,16 @@ fn main() -> Result<()> {
             )
         }
 
+        Command::Relate(args) => {
+            let root = find_ark_root(&cwd)?;
+            commands::relate::run(&root, &args.id, &args.related_ids)
+        }
+
+        Command::Context(args) => {
+            let root = find_ark_root(&cwd)?;
+            commands::context::run(&root, &args.id, &cli.format)
+        }
+
         Command::Search(args) => {
             let root = find_ark_root(&cwd)?;
             commands::search::run(

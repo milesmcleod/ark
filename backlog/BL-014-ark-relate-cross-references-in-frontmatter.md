@@ -1,7 +1,7 @@
 ---
 id: BL-014
 title: ark relate - cross-references in frontmatter
-status: backlog
+status: active
 priority: 110
 type: feature
 created: 2026-04-02

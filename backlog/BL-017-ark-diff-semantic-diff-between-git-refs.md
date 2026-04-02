@@ -1,7 +1,7 @@
 ---
 id: BL-017
 title: ark diff - semantic diff between git refs
-status: backlog
+status: active
 priority: 140
 type: feature
 created: 2026-04-02

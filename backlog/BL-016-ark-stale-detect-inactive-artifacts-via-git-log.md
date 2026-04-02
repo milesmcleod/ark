@@ -1,7 +1,7 @@
 ---
 id: BL-016
 title: ark stale - detect inactive artifacts via git log
-status: backlog
+status: active
 priority: 130
 type: feature
 created: 2026-04-02

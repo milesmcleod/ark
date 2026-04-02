@@ -205,7 +205,8 @@ fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> Stri
 
     // Priority keys first, in this order
     let priority_keys = [
-        "id", "title", "status", "priority", "project", "type", "tags", "created", "updated",
+        "id", "title", "status", "priority", "project", "type", "tags", "related", "created",
+        "updated",
     ];
 
     for key in &priority_keys {

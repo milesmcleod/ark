@@ -1,7 +1,7 @@
 ---
 id: BL-013
 title: .arkignore support for scan
-status: active
+status: done
 priority: 100
 type: feature
 created: 2026-04-02

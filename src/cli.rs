@@ -56,6 +56,12 @@ pub enum Command {
     /// Show artifact statistics
     Stats(StatsArgs),
 
+    /// Add cross-references between artifacts
+    Relate(RelateArgs),
+
+    /// Gather an artifact and all its related artifacts
+    Context(ContextArgs),
+
     /// Search artifact bodies for a pattern
     Search(SearchArgs),
 
@@ -228,6 +234,22 @@ pub struct SearchArgs {
     /// Restrict to artifact type
     #[arg(long)]
     pub artifact_type: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct RelateArgs {
+    /// Primary artifact ID
+    pub id: String,
+
+    /// Related artifact ID(s)
+    #[arg(required = true)]
+    pub related_ids: Vec<String>,
+}
+
+#[derive(clap::Args)]
+pub struct ContextArgs {
+    /// Artifact ID to gather context for
+    pub id: String,
 }
 
 #[derive(clap::Args)]

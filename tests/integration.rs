@@ -1144,3 +1144,379 @@ fn test_show_not_found() {
         .failure()
         .stderr(predicate::str::contains("artifact not found"));
 }
+
+// --- Relate and Context tests ---
+
+/// Set up a project with two artifact types (task + spec) for cross-type testing
+fn setup_multi_type_project() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let task_schema = r#"name: task
+directory: backlog
+prefix: BL
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, done]
+    default: backlog
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: tags
+    type: list
+  - name: related
+    type: list
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+archive:
+  field: status
+  value: done
+  directory: backlog/done
+"#;
+
+    let spec_schema = r#"name: spec
+directory: spec
+prefix: SPEC
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [draft, active]
+    default: draft
+  - name: related
+    type: list
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("task.yml"), task_schema).unwrap();
+    fs::write(schemas_dir.join("spec.yml"), spec_schema).unwrap();
+    dir
+}
+
+#[test]
+fn test_relate_basic_bidirectional() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Build thing", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Thing spec"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Related BL-001 <-> SPEC-001"));
+
+    // BL-001 should have SPEC-001 in its related field
+    ark()
+        .args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("SPEC-001"));
+
+    // SPEC-001 should have BL-001 in its related field (bidirectional)
+    ark()
+        .args(["show", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("BL-001"));
+}
+
+#[test]
+fn test_relate_deduplication() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Build thing", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Thing spec"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Relate twice
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Should only have SPEC-001 once in the related list
+    let output = ark()
+        .args(["-F", "json", "show", "BL-001"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let related = parsed["related"].as_array().unwrap();
+    assert_eq!(related.len(), 1);
+    assert_eq!(related[0], "SPEC-001");
+}
+
+#[test]
+fn test_relate_multiple_targets() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Task A", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "task", "--title", "Task B", "--priority", "20"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Spec A"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "BL-002", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Related BL-001 <-> [BL-002, SPEC-001]",
+        ));
+
+    // BL-001 should list both
+    let output = ark()
+        .args(["-F", "json", "show", "BL-001"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let related = parsed["related"].as_array().unwrap();
+    assert_eq!(related.len(), 2);
+}
+
+#[test]
+fn test_relate_self_reference_rejected() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Task A", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "cannot relate an artifact to itself",
+        ));
+}
+
+#[test]
+fn test_relate_nonexistent_artifact() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Task A", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "SPEC-999"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("artifact not found"));
+}
+
+#[test]
+fn test_relate_updates_date() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Task A", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Spec A"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Both should have an updated field
+    ark()
+        .args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("updated:"));
+
+    ark()
+        .args(["show", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("updated:"));
+}
+
+#[test]
+fn test_context_pretty() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Build thing", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Thing spec"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["context", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Build thing"))
+        .stdout(predicate::str::contains("Related:"))
+        .stdout(predicate::str::contains("SPEC-001"))
+        .stdout(predicate::str::contains("Thing spec"));
+}
+
+#[test]
+fn test_context_json() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Build thing", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args(["new", "spec", "--title", "Thing spec"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["relate", "BL-001", "SPEC-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let output = ark()
+        .args(["-F", "json", "context", "BL-001"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Primary has full content including body
+    assert_eq!(parsed["primary"]["id"], "BL-001");
+    assert_eq!(parsed["primary"]["title"], "Build thing");
+    assert!(parsed["primary"]["body"].is_string());
+
+    // Related has frontmatter only (no body)
+    let related = parsed["related"].as_array().unwrap();
+    assert_eq!(related.len(), 1);
+    assert_eq!(related[0]["id"], "SPEC-001");
+    assert_eq!(related[0]["title"], "Thing spec");
+    assert!(related[0].get("body").is_none());
+}
+
+#[test]
+fn test_context_no_relations() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["new", "task", "--title", "Lonely task", "--priority", "10"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Context should still show the primary artifact
+    ark()
+        .args(["context", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Lonely task"));
+
+    // JSON should have empty related array
+    let output = ark()
+        .args(["-F", "json", "context", "BL-001"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let related = parsed["related"].as_array().unwrap();
+    assert!(related.is_empty());
+}
+
+#[test]
+fn test_context_nonexistent_artifact() {
+    let dir = setup_multi_type_project();
+    ark()
+        .args(["context", "BL-999"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("artifact not found"));
+}
