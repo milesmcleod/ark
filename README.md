@@ -15,15 +15,19 @@ ark takes a different approach: **human-legible, agent-optimized**. Every artifa
 ## Install
 
 ```
+curl -sSL https://raw.githubusercontent.com/milesmcleod/ark/main/install.sh | sh
+```
+
+Or with cargo:
+
+```
 cargo install --path .
 ```
 
-Or build from source:
+To update an existing installation:
 
 ```
-git clone https://github.com/milesmcleod/ark.git
-cd ark
-cargo install --path .
+ark update
 ```
 
 For development:
@@ -141,6 +145,7 @@ ark stats task --by status
 | `ark scan stats [types]` | Aggregate statistics across projects |
 | `ark scan search <pattern>` | Search across all projects |
 | `ark scan lint` | Validate all artifacts across all projects |
+| `ark update` | Check for and install the latest version |
 | `ark schema-help` | Show the full schema format reference |
 | `ark completions <shell>` | Generate shell completions |
 

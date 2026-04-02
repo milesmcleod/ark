@@ -21,3 +21,4 @@ pub mod show;
 pub mod stale;
 pub mod stats;
 pub mod types;
+pub mod update;

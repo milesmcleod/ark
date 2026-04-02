@@ -83,6 +83,9 @@ pub enum Command {
     /// Fetch schemas from their registry URLs
     RegistryPull,
 
+    /// Check for and install the latest version
+    Update,
+
     /// Generate shell completions
     Completions(CompletionsArgs),
 

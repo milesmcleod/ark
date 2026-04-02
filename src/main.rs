@@ -163,6 +163,8 @@ fn main() -> Result<()> {
             commands::registry_pull::run(&root)
         }
 
+        Command::Update => commands::update::run(),
+
         Command::Completions(args) => commands::completions::run(args.shell),
 
         Command::SchemaHelp => commands::schema_help::run(),
