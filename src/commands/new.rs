@@ -10,6 +10,11 @@ use crate::schema::{load_schema, FieldType};
 pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     let schema = load_schema(ark_root, &args.artifact_type)?;
 
+    // Validate title is not empty
+    if args.title.trim().is_empty() {
+        bail!("title cannot be empty");
+    }
+
     // Load existing artifacts to determine next ID
     let existing = load_artifacts(ark_root, &schema)?;
     let next = next_id(&existing, &schema.prefix);
