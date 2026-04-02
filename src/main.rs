@@ -40,7 +40,7 @@ fn main() -> Result<()> {
 
         Command::Show(args) => {
             let root = find_ark_root(&cwd)?;
-            commands::show::run(&root, &args.id)
+            commands::show::run(&root, &args.id, &cli.format)
         }
 
         Command::New(args) => {

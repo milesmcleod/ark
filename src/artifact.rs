@@ -101,8 +101,10 @@ impl Artifact {
         let yaml = frontmatter_to_yaml(&self.frontmatter);
         if self.body.is_empty() {
             format!("---\n{}---\n", yaml)
-        } else {
+        } else if self.body.starts_with('\n') {
             format!("---\n{}---\n{}", yaml, self.body)
+        } else {
+            format!("---\n{}---\n\n{}", yaml, self.body)
         }
     }
 }
@@ -220,6 +222,33 @@ fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> Stri
     lines.join("")
 }
 
+/// Check if a string value needs quoting in YAML output
+fn needs_yaml_quoting(s: &str) -> bool {
+    if s.is_empty() {
+        return true
+    }
+    // Quote if it contains YAML-special characters
+    if s.contains(':') || s.contains('#') || s.contains('[') || s.contains(']')
+        || s.contains('{') || s.contains('}') || s.contains('"') || s.contains('\'')
+        || s.contains('|') || s.contains('>') || s.contains('&') || s.contains('*')
+        || s.contains('!') || s.contains('%') || s.contains('@') || s.contains('`')
+        || s.contains(',')
+    {
+        return true
+    }
+    // Quote if it starts with whitespace or special leading chars
+    let first = s.chars().next().unwrap();
+    if first.is_whitespace() || first == '-' || first == '?' {
+        return true
+    }
+    // Quote YAML booleans and null
+    let lower = s.to_lowercase();
+    if matches!(lower.as_str(), "true" | "false" | "yes" | "no" | "null" | "~") {
+        return true
+    }
+    false
+}
+
 fn format_yaml_field(key: &str, value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Array(arr) => {
@@ -229,7 +258,13 @@ fn format_yaml_field(key: &str, value: &serde_json::Value) -> String {
                 .collect();
             format!("{}: [{}]\n", key, items.join(", "))
         }
-        serde_json::Value::String(s) => format!("{}: {}\n", key, s),
+        serde_json::Value::String(s) => {
+            if needs_yaml_quoting(s) {
+                format!("{}: \"{}\"\n", key, s.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                format!("{}: {}\n", key, s)
+            }
+        }
         serde_json::Value::Number(n) => format!("{}: {}\n", key, n),
         serde_json::Value::Bool(b) => format!("{}: {}\n", key, b),
         serde_json::Value::Null => format!("{}: null\n", key),
@@ -328,5 +363,37 @@ Some body text.
         assert_eq!(reparsed.title(), Some("Test task"));
         assert_eq!(reparsed.status(), Some("backlog"));
         assert_eq!(reparsed.priority(), Some(10));
+    }
+
+    #[test]
+    fn test_roundtrip_title_with_colon() {
+        let content = r#"---
+id: BL-001
+title: "Something: with a colon"
+status: backlog
+priority: 10
+---
+
+Body here.
+"#;
+        let artifact = Artifact::from_str(content, PathBuf::from("test.md")).unwrap();
+        assert_eq!(artifact.title(), Some("Something: with a colon"));
+
+        // Roundtrip should preserve the title
+        let output = artifact.to_markdown();
+        let reparsed = Artifact::from_str(&output, PathBuf::from("test.md")).unwrap();
+        assert_eq!(reparsed.title(), Some("Something: with a colon"));
+    }
+
+    #[test]
+    fn test_yaml_quoting_special_chars() {
+        assert!(needs_yaml_quoting("has: colon"));
+        assert!(needs_yaml_quoting("has # hash"));
+        assert!(needs_yaml_quoting("[brackets]"));
+        assert!(needs_yaml_quoting("true"));
+        assert!(needs_yaml_quoting(""));
+        assert!(!needs_yaml_quoting("simple title"));
+        assert!(!needs_yaml_quoting("BL-001"));
+        assert!(!needs_yaml_quoting("2026-04-01"));
     }
 }

@@ -4,9 +4,10 @@ use anyhow::Result;
 
 use crate::artifact::load_artifacts;
 use crate::error::ArkError;
+use crate::output::OutputFormat;
 use crate::schema::load_schemas;
 
-pub fn run(ark_root: &Path, id: &str) -> Result<()> {
+pub fn run(ark_root: &Path, id: &str, format: &OutputFormat) -> Result<()> {
     let schemas = load_schemas(ark_root)?;
 
     // Determine artifact type from ID prefix
@@ -29,7 +30,25 @@ pub fn run(ark_root: &Path, id: &str) -> Result<()> {
             }
 
             if let Some(artifact) = all_artifacts.iter().find(|a| a.id() == Some(id)) {
-                print!("{}", artifact.raw);
+                match format {
+                    OutputFormat::Json => {
+                        let mut map = serde_json::Map::new();
+                        for (k, v) in &artifact.frontmatter {
+                            map.insert(k.clone(), v.clone());
+                        }
+                        map.insert(
+                            "body".into(),
+                            serde_json::Value::String(artifact.body.clone()),
+                        );
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::Value::Object(map))?
+                        );
+                    }
+                    _ => {
+                        print!("{}", artifact.raw);
+                    }
+                }
                 return Ok(())
             }
         }
