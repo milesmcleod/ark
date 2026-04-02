@@ -147,5 +147,8 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
 
     println!("Created {} at {}", id, filepath.display());
 
+    // Fire create hooks
+    crate::commands::hooks::run_create_hooks(ark_root, &args.artifact_type, &id);
+
     Ok(())
 }

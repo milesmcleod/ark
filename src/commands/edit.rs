@@ -104,11 +104,27 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
                 .frontmatter
                 .insert("updated".into(), serde_json::Value::String(today));
 
+            // Detect status change for hooks
+            let old_status = artifact.status().unwrap_or("").to_string();
+            let new_status = updated.status().unwrap_or("").to_string();
+
             // Write back
             let content = updated.to_markdown();
             std::fs::write(&artifact.path, &content)?;
 
             println!("Updated {}", id);
+
+            // Fire status change hooks if status changed
+            if old_status != new_status {
+                crate::commands::hooks::run_status_change_hooks(
+                    ark_root,
+                    &schema.name,
+                    id,
+                    &old_status,
+                    &new_status,
+                );
+            }
+
             return Ok(());
         }
     }

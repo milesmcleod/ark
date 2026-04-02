@@ -51,6 +51,12 @@ pub fn run(ark_root: &Path, artifact_type: &str) -> Result<()> {
             .expect("artifact should have a filename");
         let dest = archive_dir.join(filename);
         std::fs::rename(&artifact.path, &dest)?;
+
+        // Fire archive hooks
+        if let Some(id) = artifact.id() {
+            crate::commands::hooks::run_archive_hooks(ark_root, artifact_type, id);
+        }
+
         count += 1;
     }
 

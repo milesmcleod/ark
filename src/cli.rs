@@ -74,6 +74,12 @@ pub enum Command {
     /// Scan across nested ark projects (recursive discovery)
     Scan(ScanArgs),
 
+    /// Set up a project from a template directory of schemas
+    Scaffold(ScaffoldArgs),
+
+    /// List configured lifecycle hooks
+    Hooks,
+
     /// Fetch schemas from their registry URLs
     RegistryPull,
 
@@ -253,6 +259,12 @@ pub struct RelateArgs {
     /// Related artifact ID(s)
     #[arg(required = true)]
     pub related_ids: Vec<String>,
+}
+
+#[derive(clap::Args)]
+pub struct ScaffoldArgs {
+    /// Path to template directory containing .yml schema files
+    pub template: String,
 }
 
 #[derive(clap::Args)]
