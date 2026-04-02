@@ -35,7 +35,7 @@ Feature: Core artifact management
 
   Scenario: Create a new artifact
     Given an initialized ark project with a task schema
-    When I run `ark new task --title "Build prototype" --project bellflower --kind feature --priority 10`
+    When I run `ark new task --title "Build prototype" --project frontend --kind feature --priority 10`
     Then a new markdown file is created in the schema's declared directory
     And the file has YAML frontmatter with all provided fields
     And the id is auto-generated using the schema's prefix and next available number
@@ -51,8 +51,8 @@ Feature: Core artifact management
 
   Scenario: List artifacts with filters
     Given an initialized ark project with task artifacts across multiple projects
-    When I run `ark list task --status active --project bellflower`
-    Then I see only active tasks belonging to the bellflower project
+    When I run `ark list task --status active --project frontend`
+    Then I see only active tasks belonging to the frontend project
 
   Scenario: List artifacts with --all flag
     Given an initialized ark project with both active and archived task artifacts

@@ -463,7 +463,7 @@ fields:
   - name: project
     type: enum
     required: true
-    values: [ecosystem, alebrije, bellflower]
+    values: [ecosystem, frontend, backend]
   - name: type
     type: enum
     required: true
