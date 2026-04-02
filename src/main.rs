@@ -96,6 +96,21 @@ fn main() -> Result<()> {
             commands::context::run(&root, &args.id, &cli.format)
         }
 
+        Command::Diff(args) => {
+            let root = find_ark_root(&cwd)?;
+            commands::diff::run(
+                &root,
+                &args.git_ref,
+                args.artifact_type.as_deref(),
+                &cli.format,
+            )
+        }
+
+        Command::Stale(args) => {
+            let root = find_ark_root(&cwd)?;
+            commands::stale::run(&root, &args.artifact_type, args.days, &cli.format)
+        }
+
         Command::Search(args) => {
             let root = find_ark_root(&cwd)?;
             commands::search::run(

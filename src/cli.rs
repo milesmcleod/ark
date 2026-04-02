@@ -62,6 +62,12 @@ pub enum Command {
     /// Gather an artifact and all its related artifacts
     Context(ContextArgs),
 
+    /// Show semantic diff of artifacts between a git ref and HEAD
+    Diff(DiffArgs),
+
+    /// Find artifacts with no recent activity
+    Stale(StaleArgs),
+
     /// Search artifact bodies for a pattern
     Search(SearchArgs),
 
@@ -250,6 +256,26 @@ pub struct RelateArgs {
 pub struct ContextArgs {
     /// Artifact ID to gather context for
     pub id: String,
+}
+
+#[derive(clap::Args)]
+pub struct DiffArgs {
+    /// Git ref to compare against HEAD (e.g. main, HEAD~5, abc1234)
+    pub git_ref: String,
+
+    /// Restrict to artifact type
+    #[arg(long)]
+    pub artifact_type: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct StaleArgs {
+    /// Artifact type to check
+    pub artifact_type: String,
+
+    /// Number of days without activity to consider stale (default: 14)
+    #[arg(long, default_value = "14")]
+    pub days: u32,
 }
 
 #[derive(clap::Args)]

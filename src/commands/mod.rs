@@ -1,6 +1,7 @@
 pub mod archive;
 pub mod completions;
 pub mod context;
+pub mod diff;
 pub mod edit;
 pub mod fields;
 pub mod init;
@@ -14,5 +15,6 @@ pub mod scan;
 pub mod schema_help;
 pub mod search;
 pub mod show;
+pub mod stale;
 pub mod stats;
 pub mod types;
