@@ -11,8 +11,10 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
     let schema = load_schema(ark_root, &args.artifact_type)?;
     let mut artifacts = load_artifacts(ark_root, &schema)?;
 
-    // Exclude archived items by default
-    if let Some(archive_value) = schema.archive_value() {
+    // Exclude archived items unless --all is passed
+    if !args.all
+        && let Some(archive_value) = schema.archive_value()
+    {
         artifacts.retain(|a| a.status() != Some(archive_value));
     }
 

@@ -67,7 +67,24 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
             }
 
             // Apply --set key=value fields (validated and type-coerced against schema)
+            // Detect conflicts with named flags
+            let named_fields: &[(&str, bool)] = &[
+                ("status", args.status.is_some()),
+                ("priority", args.priority.is_some()),
+                ("title", args.title.is_some()),
+                ("project", args.project.is_some()),
+                ("type", args.kind.is_some()),
+            ];
             for (key, value) in &args.fields {
+                for (named_key, is_set) in named_fields {
+                    if key == named_key && *is_set {
+                        anyhow::bail!(
+                            "conflict: --{} and --set {}= both set the same field. Use one or the other.",
+                            named_key,
+                            named_key
+                        );
+                    }
+                }
                 validate_field_value(schema, key, value)?;
                 updated.frontmatter.insert(
                     key.clone(),

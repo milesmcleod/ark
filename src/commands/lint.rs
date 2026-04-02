@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::artifact::load_artifacts;
 use crate::schema::{Schema, load_schema, load_schemas};
 
-pub fn run(ark_root: &Path, target: Option<&str>, _fix: bool) -> Result<()> {
+pub fn run(ark_root: &Path, target: Option<&str>) -> Result<()> {
     let mut total_errors = 0;
     let mut total_warnings = 0;
     let mut total_files = 0;

@@ -63,7 +63,7 @@ fn main() -> Result<()> {
 
         Command::Lint(args) => {
             let root = find_ark_root(&cwd)?;
-            commands::lint::run(&root, args.target.as_deref(), args.fix)
+            commands::lint::run(&root, args.target.as_deref())
         }
 
         Command::Archive(args) => {

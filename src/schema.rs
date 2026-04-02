@@ -186,6 +186,35 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
         return Err(ArkError::NoSchemas.into());
     }
 
+    // Validate directory containment - no escaping the project root
+    for schema in schemas.values() {
+        let resolved = ark_root.join(&schema.directory);
+        // Check for path traversal (../ or absolute paths)
+        if schema.directory.starts_with('/')
+            || schema.directory.contains("..")
+            || resolved
+                .canonicalize()
+                .unwrap_or(resolved.clone())
+                .strip_prefix(ark_root.canonicalize().unwrap_or(ark_root.to_path_buf()))
+                .is_err()
+        {
+            anyhow::bail!(
+                "schema '{}' has directory '{}' that escapes the project root. Directories must be relative paths within the project.",
+                schema.name,
+                schema.directory
+            );
+        }
+        if let Some(ref archive) = schema.archive
+            && (archive.directory.starts_with('/') || archive.directory.contains(".."))
+        {
+            anyhow::bail!(
+                "schema '{}' has archive directory '{}' that escapes the project root.",
+                schema.name,
+                archive.directory
+            );
+        }
+    }
+
     // Validate no overlapping directories between schemas
     let dirs: Vec<(&str, &str)> = schemas
         .values()

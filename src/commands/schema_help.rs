@@ -64,7 +64,7 @@ Example
       type: string
       required: true
       derived: true
-      pattern: "^BL-\\d{{3}}$"
+      pattern: "^BL-\\d{{3,}}$"
     - name: title
       type: string
       required: true

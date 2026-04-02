@@ -26,7 +26,12 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     // Load existing artifacts to determine next ID
     let existing = load_artifacts(ark_root, &schema)?;
     let next = next_id(&existing, &schema.prefix);
-    let id = format!("{}-{:03}", schema.prefix, next);
+    let width = if next >= 1000 {
+        (next as f64).log10().floor() as usize + 1
+    } else {
+        3
+    };
+    let id = format!("{}-{:0>width$}", schema.prefix, next);
     let today = Local::now().format("%Y-%m-%d").to_string();
 
     // Build frontmatter
@@ -78,8 +83,28 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     }
 
     // Set extra fields (validated and type-coerced against schema)
+    // Detect conflicts with named flags
     if let Some(ref extras) = args.extra_fields {
+        let named_fields: &[(&str, bool)] = &[
+            ("status", args.status.is_some()),
+            ("priority", args.priority.is_some()),
+            ("project", args.project.is_some()),
+            ("type", args.kind.is_some()),
+        ];
         for (key, value) in extras {
+            for (named_key, is_set) in named_fields {
+                if key == named_key && *is_set {
+                    anyhow::bail!(
+                        "conflict: --{} and --set {}= both set the same field. Use one or the other.",
+                        if *named_key == "type" {
+                            "kind"
+                        } else {
+                            named_key
+                        },
+                        named_key
+                    );
+                }
+            }
             validate_field_value(&schema, key, value)?;
             frontmatter.insert(
                 key.clone(),

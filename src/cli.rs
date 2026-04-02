@@ -90,6 +90,10 @@ pub struct ListArgs {
     #[arg(long)]
     pub tag: Option<String>,
 
+    /// Include archived items
+    #[arg(long)]
+    pub all: bool,
+
     /// Maximum number of items to show
     #[arg(long, short = 'n')]
     pub limit: Option<usize>,
@@ -169,10 +173,6 @@ pub struct EditArgs {
 pub struct LintArgs {
     /// Artifact type or specific ID to lint (lints all if omitted)
     pub target: Option<String>,
-
-    /// Attempt to auto-fix issues
-    #[arg(long)]
-    pub fix: bool,
 }
 
 #[derive(clap::Args)]
