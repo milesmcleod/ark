@@ -107,7 +107,7 @@ fn discover_recursive(
             Err(_) => continue,
         };
         let path = entry.path();
-        if !path.is_dir() {
+        if !path.is_dir() || path.is_symlink() {
             continue;
         }
 

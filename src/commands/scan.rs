@@ -412,7 +412,7 @@ pub fn run_lint(cwd: &Path) -> Result<()> {
     }
 
     if total_errors > 0 {
-        std::process::exit(1);
+        anyhow::bail!("scan lint failed with {} error(s)", total_errors);
     }
 
     Ok(())

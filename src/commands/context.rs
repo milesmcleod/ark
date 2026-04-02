@@ -2,40 +2,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::artifact::{Artifact, load_artifacts};
-use crate::error::ArkError;
+use crate::artifact::{Artifact, find_artifact_by_id};
 use crate::output::OutputFormat;
-use crate::schema::load_schemas;
-
-/// Find an artifact by ID across all schema types
-fn find_artifact(ark_root: &Path, id: &str) -> Result<Artifact> {
-    let schemas = load_schemas(ark_root)?;
-
-    for schema in schemas.values() {
-        if id.starts_with(&schema.prefix) {
-            let artifacts = load_artifacts(ark_root, schema)?;
-            let mut all_artifacts = artifacts;
-            if let Some(archive_dir) = schema.archive_directory() {
-                let archive_path = ark_root.join(archive_dir);
-                if archive_path.is_dir() {
-                    let archive_schema = crate::schema::Schema {
-                        directory: archive_dir.to_string(),
-                        ..schema.clone()
-                    };
-                    if let Ok(archived) = load_artifacts(ark_root, &archive_schema) {
-                        all_artifacts.extend(archived);
-                    }
-                }
-            }
-
-            if let Some(artifact) = all_artifacts.into_iter().find(|a| a.id() == Some(id)) {
-                return Ok(artifact);
-            }
-        }
-    }
-
-    Err(ArkError::ArtifactNotFound(id.to_string()).into())
-}
 
 /// Format a frontmatter summary for a related artifact (pretty/tsv mode)
 fn frontmatter_summary(artifact: &Artifact) -> String {
@@ -72,7 +40,7 @@ fn frontmatter_summary(artifact: &Artifact) -> String {
 }
 
 pub fn run(ark_root: &Path, id: &str, format: &OutputFormat) -> Result<()> {
-    let primary = find_artifact(ark_root, id)?;
+    let primary = find_artifact_by_id(ark_root, id)?;
 
     // Get related IDs
     let related_ids = primary.get_list("related");
@@ -80,7 +48,7 @@ pub fn run(ark_root: &Path, id: &str, format: &OutputFormat) -> Result<()> {
     // Resolve related artifacts (skip any that can't be found, warn on stderr)
     let mut related_artifacts = Vec::new();
     for related_id in &related_ids {
-        match find_artifact(ark_root, related_id) {
+        match find_artifact_by_id(ark_root, related_id) {
             Ok(artifact) => related_artifacts.push(artifact),
             Err(_) => {
                 eprintln!(

@@ -21,7 +21,7 @@ pub fn run(
         .current_dir(ark_root)
         .output();
 
-    if git_check.is_err() || !git_check.unwrap().status.success() {
+    if !git_check.is_ok_and(|o| o.status.success()) {
         bail!("not a git repository. ark diff requires git.");
     }
 

@@ -10,6 +10,9 @@ use crate::schema::load_schemas;
 use crate::validate::validate_field_value;
 
 pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
+    let lock_path = ark_root.join(".ark").join(".lock");
+    let _lock = crate::lock::acquire_lock(&lock_path)?;
+
     let schemas = load_schemas(ark_root)?;
     let id = &args.id;
 
@@ -91,9 +94,14 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
             for (key, value) in &args.fields {
                 for (named_key, is_set) in named_fields {
                     if key == named_key && *is_set {
+                        let flag_name = if *named_key == "type" {
+                            "kind"
+                        } else {
+                            named_key
+                        };
                         anyhow::bail!(
                             "conflict: --{} and --set {}= both set the same field. Use one or the other.",
-                            named_key,
+                            flag_name,
                             named_key
                         );
                     }

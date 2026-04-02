@@ -354,8 +354,8 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
 }
 
 /// Load a single schema by artifact type name.
-/// Scans schema files individually to avoid loading all schemas.
-/// If the schema uses `extends`, loads and resolves the base schema too.
+/// Loads all schemas and resolves inheritance to ensure the returned
+/// schema has all inherited fields merged.
 pub fn load_schema(ark_root: &Path, type_name: &str) -> Result<Schema> {
     let schemas_dir = ark_root.join(".ark").join("schemas");
     if !schemas_dir.is_dir() {

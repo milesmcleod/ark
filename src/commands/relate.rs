@@ -3,40 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 use chrono::Local;
 
-use crate::artifact::{Artifact, load_artifacts};
-use crate::error::ArkError;
-use crate::schema::load_schemas;
-
-/// Find an artifact by ID across all schema types, returning a clone and its path
-fn find_artifact(ark_root: &Path, id: &str) -> Result<Artifact> {
-    let schemas = load_schemas(ark_root)?;
-
-    for schema in schemas.values() {
-        if id.starts_with(&schema.prefix) {
-            let artifacts = load_artifacts(ark_root, schema)?;
-            // Also check archive directory
-            let mut all_artifacts = artifacts;
-            if let Some(archive_dir) = schema.archive_directory() {
-                let archive_path = ark_root.join(archive_dir);
-                if archive_path.is_dir() {
-                    let archive_schema = crate::schema::Schema {
-                        directory: archive_dir.to_string(),
-                        ..schema.clone()
-                    };
-                    if let Ok(archived) = load_artifacts(ark_root, &archive_schema) {
-                        all_artifacts.extend(archived);
-                    }
-                }
-            }
-
-            if let Some(artifact) = all_artifacts.into_iter().find(|a| a.id() == Some(id)) {
-                return Ok(artifact);
-            }
-        }
-    }
-
-    Err(ArkError::ArtifactNotFound(id.to_string()).into())
-}
+use crate::artifact::{Artifact, find_artifact_by_id};
 
 /// Add related IDs to an artifact's frontmatter (deduplicated) and write it back
 fn add_related(artifact: &Artifact, new_ids: &[&str]) -> Result<()> {
@@ -77,7 +44,7 @@ fn add_related(artifact: &Artifact, new_ids: &[&str]) -> Result<()> {
 
 pub fn run(ark_root: &Path, id: &str, related_ids: &[String]) -> Result<()> {
     // Validate that the primary artifact exists
-    let primary = find_artifact(ark_root, id)?;
+    let primary = find_artifact_by_id(ark_root, id)?;
 
     // Validate that all related artifacts exist
     let mut related_artifacts = Vec::new();
@@ -85,7 +52,7 @@ pub fn run(ark_root: &Path, id: &str, related_ids: &[String]) -> Result<()> {
         if related_id == id {
             anyhow::bail!("cannot relate an artifact to itself: {}", id);
         }
-        let artifact = find_artifact(ark_root, related_id)?;
+        let artifact = find_artifact_by_id(ark_root, related_id)?;
         related_artifacts.push(artifact);
     }
 

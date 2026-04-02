@@ -6,6 +6,9 @@ use crate::artifact::load_artifacts;
 use crate::schema::load_schema;
 
 pub fn run(ark_root: &Path, artifact_type: &str) -> Result<()> {
+    let lock_path = ark_root.join(".ark").join(".lock");
+    let _lock = crate::lock::acquire_lock(&lock_path)?;
+
     let schema = load_schema(ark_root, artifact_type)?;
 
     let archive_value = match schema.archive_value() {

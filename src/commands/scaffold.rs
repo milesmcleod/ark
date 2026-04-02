@@ -41,7 +41,7 @@ pub fn run(cwd: &Path, template: &str) -> Result<()> {
 
             if dest.exists() {
                 eprintln!(
-                    "  warning: {} already exists, skipping (use --force to overwrite)",
+                    "  warning: {} already exists, skipping. Delete it first to replace.",
                     filename.to_string_lossy()
                 );
                 continue;

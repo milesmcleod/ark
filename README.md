@@ -127,7 +127,20 @@ ark stats task --by status
 | `ark archive <type>` | Move completed artifacts to archive directory |
 | `ark rebalance <type>` | Re-number priorities in even increments |
 | `ark stats [type]` | Show artifact counts and groupings |
-| `ark search <pattern>` | Search artifact titles and bodies (regex) |
+| `ark relate <id> <ids...>` | Add bidirectional cross-references between artifacts |
+| `ark context <id>` | Gather an artifact and all its related artifacts |
+| `ark diff <ref>` | Show semantic diff of artifacts between a git ref and HEAD |
+| `ark stale <type>` | Find artifacts with no recent activity |
+| `ark search <pattern>` | Search artifact titles and bodies (regex, `-i` for case-insensitive) |
+| `ark scaffold <path>` | Set up a new project from a template directory of schemas |
+| `ark hooks` | List configured lifecycle hooks |
+| `ark registry-pull` | Fetch schemas from their registry URLs |
+| `ark scan types` | List artifact types across all nested projects |
+| `ark scan list <types>` | List artifacts across projects (comma-separated type aliasing) |
+| `ark scan next <types>` | Cross-project priority queue |
+| `ark scan stats [types]` | Aggregate statistics across projects |
+| `ark scan search <pattern>` | Search across all projects |
+| `ark scan lint` | Validate all artifacts across all projects |
 | `ark schema-help` | Show the full schema format reference |
 | `ark completions <shell>` | Generate shell completions |
 

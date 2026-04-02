@@ -35,8 +35,7 @@ pub fn run(ark_root: &Path, target: Option<&str>) -> Result<()> {
                 }
             }
             if !found {
-                eprintln!("Unknown type or artifact ID: {}", target);
-                std::process::exit(1);
+                anyhow::bail!("unknown type or artifact ID: {}", target);
             }
         }
     } else {
@@ -70,7 +69,7 @@ pub fn run(ark_root: &Path, target: Option<&str>) -> Result<()> {
     }
 
     if total_errors > 0 {
-        std::process::exit(1);
+        anyhow::bail!("lint failed with {} error(s)", total_errors);
     }
 
     Ok(())

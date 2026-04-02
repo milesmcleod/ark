@@ -27,9 +27,41 @@ Format
     field: <string>        # field to check for archive eligibility
     value: <string>        # value that triggers archiving
     directory: <string>    # where to move archived artifacts
+  extends: <string>        # optional: inherit fields from another schema by name
+  registry: <url>          # optional: URL to fetch this schema from (ark registry-pull)
   template: |              # optional body template for new artifacts
     ## Section
     Content here.
+
+Schema Inheritance
+------------------
+
+  A schema can extend another using the `extends` field:
+
+    name: my-task
+    extends: base-task
+    directory: backlog
+    prefix: BL
+    fields:
+      - name: project
+        type: enum
+        values: [alpha, beta]
+
+  The child inherits all fields from the base. Child fields with the
+  same name override the base. Directory, prefix, archive, and template
+  are inherited if not set by the child.
+
+Schema Registry
+---------------
+
+  A schema can declare a registry URL:
+
+    name: task
+    registry: https://raw.githubusercontent.com/org/schemas/main/task.yml
+
+  Run `ark registry-pull` to fetch the latest version from all registry
+  URLs. The fetched content replaces the local schema file. Edit locally
+  after fetch to customize.
 
 CLI Flag Mapping
 ----------------

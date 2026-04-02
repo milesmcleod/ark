@@ -47,7 +47,7 @@ pub enum Command {
     /// Re-number priorities in increments of 10
     Rebalance(RebalanceArgs),
 
-    /// Show valid values for a field on an artifact type
+    /// Show fields and valid values for an artifact type
     Fields(FieldsArgs),
 
     /// List registered artifact types

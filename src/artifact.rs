@@ -151,6 +151,35 @@ pub fn next_id(artifacts: &[Artifact], prefix: &str) -> u32 {
     max + 1
 }
 
+/// Find a single artifact by ID across all schemas, including archives.
+pub fn find_artifact_by_id(ark_root: &Path, id: &str) -> Result<Artifact> {
+    let schemas = crate::schema::load_schemas(ark_root)?;
+
+    for schema in schemas.values() {
+        if id.starts_with(&schema.prefix) {
+            let mut all_artifacts = load_artifacts(ark_root, schema)?;
+            if let Some(archive_dir) = schema.archive_directory() {
+                let archive_path = ark_root.join(archive_dir);
+                if archive_path.is_dir() {
+                    let archive_schema = crate::schema::Schema {
+                        directory: archive_dir.to_string(),
+                        ..schema.clone()
+                    };
+                    if let Ok(archived) = load_artifacts(ark_root, &archive_schema) {
+                        all_artifacts.extend(archived);
+                    }
+                }
+            }
+
+            if let Some(artifact) = all_artifacts.into_iter().find(|a| a.id() == Some(id)) {
+                return Ok(artifact);
+            }
+        }
+    }
+
+    Err(crate::error::ArkError::ArtifactNotFound(id.to_string()).into())
+}
+
 /// Slugify a title for use in filenames
 pub fn slugify(title: &str) -> String {
     title
