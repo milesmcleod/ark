@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+echo "Running pre-commit checks..."
+
+# Format check (fast, catches formatting before clippy)
+echo "  fmt..."
+cargo fmt -- --check 2>&1 || {
+    echo "Format check failed. Run 'cargo fmt' to fix."
+    exit 1
+}
+
+# Clippy (catches lint issues)
+echo "  clippy..."
+cargo clippy -- -D warnings 2>&1 || {
+    echo "Clippy failed. Fix warnings above."
+    exit 1
+}
+
+# Tests
+echo "  tests..."
+cargo test --quiet 2>&1 || {
+    echo "Tests failed. Fix failures above."
+    exit 1
+}
+
+echo "Pre-commit checks passed."
