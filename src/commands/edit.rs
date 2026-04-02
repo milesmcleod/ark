@@ -66,12 +66,12 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
                 changed = true;
             }
 
-            // Apply --set key=value fields (validated against schema)
+            // Apply --set key=value fields (validated and type-coerced against schema)
             for (key, value) in &args.fields {
                 validate_field_value(schema, key, value)?;
                 updated
                     .frontmatter
-                    .insert(key.clone(), serde_json::Value::String(value.clone()));
+                    .insert(key.clone(), crate::validate::coerce_value(schema, key, value));
                 changed = true;
             }
 

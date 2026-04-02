@@ -11,10 +11,17 @@ use crate::validate::{validate_field_value, validate_required_fields, validate_u
 pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     let schema = load_schema(ark_root, &args.artifact_type)?;
 
-    // Validate title is not empty
+    // Validate title
     if args.title.trim().is_empty() {
         bail!("title cannot be empty");
     }
+    if args.title.contains('\n') || args.title.contains('\r') {
+        bail!("title cannot contain newlines");
+    }
+
+    // Acquire lock for atomic ID generation
+    let lock_path = ark_root.join(".ark").join(".lock");
+    let _lock = crate::lock::acquire_lock(&lock_path)?;
 
     // Load existing artifacts to determine next ID
     let existing = load_artifacts(ark_root, &schema)?;
@@ -73,11 +80,11 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
         );
     }
 
-    // Set extra fields (validated against schema)
+    // Set extra fields (validated and type-coerced against schema)
     if let Some(ref extras) = args.extra_fields {
         for (key, value) in extras {
             validate_field_value(&schema, key, value)?;
-            frontmatter.insert(key.clone(), serde_json::Value::String(value.clone()));
+            frontmatter.insert(key.clone(), crate::validate::coerce_value(&schema, key, value));
         }
     }
 

@@ -1,8 +1,8 @@
 ---
-id: BL-005
-title: Validate --set values against schema
-status: active
-priority: 15
+id: BL-006
+title: Validate required fields on ark new
+status: done
+priority: 12
 type: bug
 created: 2026-04-02
 updated: 2026-04-02

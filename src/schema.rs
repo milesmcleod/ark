@@ -184,6 +184,22 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
         return Err(ArkError::NoSchemas.into());
     }
 
+    // Validate no overlapping directories between schemas
+    let dirs: Vec<(&str, &str)> = schemas
+        .values()
+        .map(|s| (s.name.as_str(), s.directory.as_str()))
+        .collect();
+    for (i, (name_a, dir_a)) in dirs.iter().enumerate() {
+        for (name_b, dir_b) in dirs.iter().skip(i + 1) {
+            if dir_a == dir_b {
+                anyhow::bail!(
+                    "schema conflict: '{}' and '{}' both use directory '{}'. Each artifact type must have its own directory.",
+                    name_a, name_b, dir_a
+                );
+            }
+        }
+    }
+
     Ok(schemas)
 }
 

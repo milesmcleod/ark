@@ -243,7 +243,16 @@ fn needs_yaml_quoting(s: &str) -> bool {
     }
     // Quote YAML booleans and null
     let lower = s.to_lowercase();
-    if matches!(lower.as_str(), "true" | "false" | "yes" | "no" | "null" | "~") {
+    if matches!(lower.as_str(), "true" | "false" | "yes" | "no" | "null" | "~"
+        | "on" | "off" | "y" | "n") {
+        return true
+    }
+    // Quote if it parses as a number (would be interpreted as int/float by YAML)
+    if s.parse::<i64>().is_ok() || s.parse::<f64>().is_ok() {
+        return true
+    }
+    // Quote if it contains newlines
+    if s.contains('\n') || s.contains('\r') {
         return true
     }
     false

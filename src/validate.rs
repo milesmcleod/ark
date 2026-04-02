@@ -57,12 +57,57 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
                     );
                 }
             }
+            FieldType::String => {
+                // Validate pattern if present
+                if let Some(ref pattern) = field.pattern {
+                    if let Ok(re) = regex_lite::Regex::new(pattern) {
+                        if !re.is_match(value) {
+                            bail!(
+                                "value '{}' for field '{}' does not match pattern '{}'",
+                                value,
+                                field_name,
+                                pattern
+                            );
+                        }
+                    }
+                }
+            }
+            FieldType::List => {
+                // List values can't be set via --set as a single string
+                // (would need special parsing). Warn the user.
+                bail!(
+                    "field '{}' is a list type. Use --tags for tag lists, or edit the file directly for other list fields.",
+                    field_name
+                );
+            }
+        }
+    } else {
+        // Field not in schema - warn on stderr but don't block
+        eprintln!(
+            "  warning: field '{}' is not defined in the schema. It will be stored but not validated.",
+            field_name
+        );
+    }
+    Ok(())
+}
+
+/// Convert a string value to the appropriate serde_json::Value based on schema field type.
+/// This ensures booleans are stored as booleans, integers as integers, etc.
+pub fn coerce_value(schema: &Schema, field_name: &str, value: &str) -> serde_json::Value {
+    if let Some(field) = schema.get_field(field_name) {
+        match field.field_type {
+            FieldType::Integer => {
+                if let Ok(n) = value.parse::<i64>() {
+                    return serde_json::json!(n)
+                }
+            }
+            FieldType::Boolean => {
+                return serde_json::Value::Bool(value == "true")
+            }
             _ => {}
         }
     }
-    // Fields not in schema are allowed (open schema philosophy)
-    // but we've validated any that ARE in the schema
-    Ok(())
+    serde_json::Value::String(value.to_string())
 }
 
 /// Check that all required non-derived fields are present in frontmatter

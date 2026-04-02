@@ -2,6 +2,7 @@ mod artifact;
 mod cli;
 mod commands;
 mod error;
+mod lock;
 mod output;
 mod schema;
 mod validate;
