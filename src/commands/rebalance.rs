@@ -10,8 +10,11 @@ pub fn run(ark_root: &Path, artifact_type: &str, gap: i64) -> Result<()> {
     let schema = load_schema(ark_root, artifact_type)?;
 
     if schema.priority_field().is_none() {
-        println!("'{}' schema has no priority field. Nothing to rebalance.", artifact_type);
-        return Ok(())
+        println!(
+            "'{}' schema has no priority field. Nothing to rebalance.",
+            artifact_type
+        );
+        return Ok(());
     }
 
     let mut artifacts = load_artifacts(ark_root, &schema)?;

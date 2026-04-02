@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::artifact::Artifact;
 use crate::schema::{FieldType, Schema};
@@ -19,15 +19,15 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
 
         match field.field_type {
             FieldType::Enum => {
-                if let Some(ref values) = field.values {
-                    if !values.contains(&value.to_string()) {
-                        bail!(
-                            "invalid value '{}' for field '{}'. Valid values: {}",
-                            value,
-                            field_name,
-                            values.join(", ")
-                        );
-                    }
+                if let Some(ref values) = field.values
+                    && !values.contains(&value.to_string())
+                {
+                    bail!(
+                        "invalid value '{}' for field '{}'. Valid values: {}",
+                        value,
+                        field_name,
+                        values.join(", ")
+                    );
                 }
             }
             FieldType::Integer => {
@@ -59,17 +59,16 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
             }
             FieldType::String => {
                 // Validate pattern if present
-                if let Some(ref pattern) = field.pattern {
-                    if let Ok(re) = regex_lite::Regex::new(pattern) {
-                        if !re.is_match(value) {
-                            bail!(
-                                "value '{}' for field '{}' does not match pattern '{}'",
-                                value,
-                                field_name,
-                                pattern
-                            );
-                        }
-                    }
+                if let Some(ref pattern) = field.pattern
+                    && let Ok(re) = regex_lite::Regex::new(pattern)
+                    && !re.is_match(value)
+                {
+                    bail!(
+                        "value '{}' for field '{}' does not match pattern '{}'",
+                        value,
+                        field_name,
+                        pattern
+                    );
                 }
             }
             FieldType::List => {
@@ -98,12 +97,10 @@ pub fn coerce_value(schema: &Schema, field_name: &str, value: &str) -> serde_jso
         match field.field_type {
             FieldType::Integer => {
                 if let Ok(n) = value.parse::<i64>() {
-                    return serde_json::json!(n)
+                    return serde_json::json!(n);
                 }
             }
-            FieldType::Boolean => {
-                return serde_json::Value::Bool(value == "true")
-            }
+            FieldType::Boolean => return serde_json::Value::Bool(value == "true"),
             _ => {}
         }
     }
@@ -138,10 +135,10 @@ pub fn validate_unique_priority(
 ) -> Result<()> {
     for artifact in existing {
         if artifact.priority() == Some(priority) {
-            if let Some(exclude) = exclude_id {
-                if artifact.id() == Some(exclude) {
-                    continue;
-                }
+            if let Some(exclude) = exclude_id
+                && artifact.id() == Some(exclude)
+            {
+                continue;
             }
             bail!(
                 "priority {} is already used by {}. Use `ark list` to see current priorities.",

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::output::{render_table, OutputFormat};
+use crate::output::{OutputFormat, render_table};
 use crate::schema::load_schemas;
 
 pub fn run(ark_root: &Path, format: &OutputFormat) -> Result<()> {

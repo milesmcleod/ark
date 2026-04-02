@@ -3,10 +3,15 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::artifact::load_artifacts;
-use crate::output::{render_table, OutputFormat};
+use crate::output::{OutputFormat, render_table};
 use crate::schema::load_schema;
 
-pub fn run(ark_root: &Path, artifact_type: &str, count: usize, format: &OutputFormat) -> Result<()> {
+pub fn run(
+    ark_root: &Path,
+    artifact_type: &str,
+    count: usize,
+    format: &OutputFormat,
+) -> Result<()> {
     let schema = load_schema(ark_root, artifact_type)?;
     let mut artifacts = load_artifacts(ark_root, &schema)?;
 
@@ -39,7 +44,7 @@ pub fn run(ark_root: &Path, artifact_type: &str, count: usize, format: &OutputFo
             "No active or queued {} artifacts. Create one with `ark new {}`.",
             artifact_type, artifact_type
         );
-        return Ok(())
+        return Ok(());
     }
 
     if !active.is_empty() {

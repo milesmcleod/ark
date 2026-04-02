@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::artifact::load_artifacts;
-use crate::schema::{load_schema, load_schemas, Schema};
+use crate::schema::{Schema, load_schema, load_schemas};
 
 pub fn run(ark_root: &Path, target: Option<&str>, _fix: bool) -> Result<()> {
     let mut total_errors = 0;
@@ -121,9 +121,8 @@ fn lint_type(ark_root: &Path, schema: &Schema) -> Result<(usize, usize, usize)> 
 
     // Validate each artifact against schema
     let json_schema = schema.to_json_schema();
-    let validator = jsonschema::validator_for(&json_schema).map_err(|e| {
-        anyhow::anyhow!("failed to compile schema for '{}': {}", schema.name, e)
-    })?;
+    let validator = jsonschema::validator_for(&json_schema)
+        .map_err(|e| anyhow::anyhow!("failed to compile schema for '{}': {}", schema.name, e))?;
 
     for artifact in &artifacts {
         let (errors, warnings) = lint_artifact_with_validator(artifact, schema, &validator);
@@ -134,18 +133,12 @@ fn lint_type(ark_root: &Path, schema: &Schema) -> Result<(usize, usize, usize)> 
     Ok((artifacts.len(), total_errors, total_warnings))
 }
 
-fn lint_artifact(
-    artifact: &crate::artifact::Artifact,
-    schema: &Schema,
-) -> (usize, usize) {
+fn lint_artifact(artifact: &crate::artifact::Artifact, schema: &Schema) -> (usize, usize) {
     let json_schema = schema.to_json_schema();
     match jsonschema::validator_for(&json_schema) {
         Ok(validator) => lint_artifact_with_validator(artifact, schema, &validator),
         Err(e) => {
-            report_error(
-                &artifact.path,
-                &format!("failed to compile schema: {}", e),
-            );
+            report_error(&artifact.path, &format!("failed to compile schema: {}", e));
             (1, 0)
         }
     }
@@ -163,18 +156,16 @@ fn lint_artifact_with_validator(
 
     // Check ID format
     if let Some(id) = artifact.id() {
-        if let Some(field) = schema.id_field() {
-            if let Some(ref pattern) = field.pattern {
-                if let Ok(re) = regex_lite::Regex::new(pattern) {
-                    if !re.is_match(id) {
-                        report_error(
-                            &artifact.path,
-                            &format!("ID '{}' does not match pattern '{}'", id, pattern),
-                        );
-                        errors += 1;
-                    }
-                }
-            }
+        if let Some(field) = schema.id_field()
+            && let Some(ref pattern) = field.pattern
+            && let Ok(re) = regex_lite::Regex::new(pattern)
+            && !re.is_match(id)
+        {
+            report_error(
+                &artifact.path,
+                &format!("ID '{}' does not match pattern '{}'", id, pattern),
+            );
+            errors += 1;
         }
     } else if schema.id_field().is_some_and(|f| f.required) {
         report_error(&artifact.path, "missing required field 'id'");

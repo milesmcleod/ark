@@ -15,7 +15,7 @@ pub fn run(ark_root: &Path, artifact_type: &str) -> Result<()> {
                 "No archive configuration for '{}'. Add an 'archive' section to the schema.",
                 artifact_type
             );
-            return Ok(())
+            return Ok(());
         }
     };
 
@@ -23,7 +23,7 @@ pub fn run(ark_root: &Path, artifact_type: &str) -> Result<()> {
         Some(d) => ark_root.join(d),
         None => {
             println!("No archive directory configured for '{}'.", artifact_type);
-            return Ok(())
+            return Ok(());
         }
     };
 
@@ -38,7 +38,7 @@ pub fn run(ark_root: &Path, artifact_type: &str) -> Result<()> {
             "No {} artifacts with status '{}' to archive.",
             artifact_type, archive_value
         );
-        return Ok(())
+        return Ok(());
     }
 
     std::fs::create_dir_all(&archive_dir)?;

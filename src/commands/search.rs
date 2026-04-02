@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::artifact::load_artifacts;
-use crate::output::{render_table, OutputFormat};
+use crate::output::{OutputFormat, render_table};
 use crate::schema::{load_schema, load_schemas};
 
 pub fn run(
@@ -38,7 +38,7 @@ pub fn run(
 
     if matches.is_empty() {
         println!("No artifacts matching '{}' found.", pattern);
-        return Ok(())
+        return Ok(());
     }
 
     let headers = &["type", "id", "title", "match_in"];

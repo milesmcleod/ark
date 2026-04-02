@@ -49,7 +49,7 @@ pub fn run(ark_root: &Path, id: &str, format: &OutputFormat) -> Result<()> {
                         print!("{}", artifact.raw);
                     }
                 }
-                return Ok(())
+                return Ok(());
             }
         }
     }

@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::artifact::load_artifacts;
-use crate::output::{render_table, OutputFormat};
+use crate::output::{OutputFormat, render_table};
 use crate::schema::{load_schema, load_schemas};
 
 pub fn run(
@@ -21,10 +21,7 @@ pub fn run(
             // Group by a specific field
             let mut groups: HashMap<String, usize> = HashMap::new();
             for artifact in &artifacts {
-                let value = artifact
-                    .get_str(field)
-                    .unwrap_or("(none)")
-                    .to_string();
+                let value = artifact.get_str(field).unwrap_or("(none)").to_string();
                 *groups.entry(value).or_default() += 1;
             }
 

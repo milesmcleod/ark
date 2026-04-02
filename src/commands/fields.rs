@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::error::ArkError;
-use crate::output::{render_table, OutputFormat};
+use crate::output::{OutputFormat, render_table};
 use crate::schema::load_schema;
 
 pub fn run(
@@ -16,12 +16,12 @@ pub fn run(
 
     if let Some(field_name) = field {
         // Show values for a specific field
-        let field_def = schema.get_field(field_name).ok_or_else(|| {
-            ArkError::UnknownField {
+        let field_def = schema
+            .get_field(field_name)
+            .ok_or_else(|| ArkError::UnknownField {
                 artifact_type: artifact_type.to_string(),
                 field: field_name.to_string(),
-            }
-        })?;
+            })?;
 
         match &field_def.values {
             Some(values) => {
@@ -50,10 +50,7 @@ pub fn run(
                     if f.required { "yes" } else { "" }.into(),
                     if f.unique { "yes" } else { "" }.into(),
                     if f.derived { "yes" } else { "" }.into(),
-                    f.values
-                        .as_ref()
-                        .map(|v| v.join(", "))
-                        .unwrap_or_default(),
+                    f.values.as_ref().map(|v| v.join(", ")).unwrap_or_default(),
                 ]
             })
             .collect();

@@ -62,7 +62,8 @@ template: |
 #[test]
 fn test_init_creates_ark_dir() {
     let dir = TempDir::new().unwrap();
-    ark().arg("init")
+    ark()
+        .arg("init")
         .current_dir(dir.path())
         .assert()
         .success()
@@ -75,7 +76,8 @@ fn test_init_creates_ark_dir() {
 fn test_init_fails_if_already_initialized() {
     let dir = TempDir::new().unwrap();
     ark().arg("init").current_dir(dir.path()).assert().success();
-    ark().arg("init")
+    ark()
+        .arg("init")
         .current_dir(dir.path())
         .assert()
         .failure()
@@ -85,7 +87,8 @@ fn test_init_fails_if_already_initialized() {
 #[test]
 fn test_types_lists_schemas() {
     let dir = setup_project();
-    ark().arg("types")
+    ark()
+        .arg("types")
         .current_dir(dir.path())
         .assert()
         .success()
@@ -95,7 +98,8 @@ fn test_types_lists_schemas() {
 #[test]
 fn test_fields_lists_all_fields() {
     let dir = setup_project();
-    ark().args(["fields", "task"])
+    ark()
+        .args(["fields", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -106,7 +110,8 @@ fn test_fields_lists_all_fields() {
 #[test]
 fn test_fields_shows_enum_values() {
     let dir = setup_project();
-    ark().args(["fields", "task", "status"])
+    ark()
+        .args(["fields", "task", "status"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -118,12 +123,18 @@ fn test_fields_shows_enum_values() {
 #[test]
 fn test_new_creates_artifact() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Test task",
-            "--project", "alpha",
-            "--kind", "chore",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test task",
+            "--project",
+            "alpha",
+            "--kind",
+            "chore",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -142,11 +153,16 @@ fn test_new_creates_artifact() {
 #[test]
 fn test_new_rejects_invalid_enum() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Bad task",
-            "--project", "nonexistent",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Bad task",
+            "--project",
+            "nonexistent",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -157,27 +173,38 @@ fn test_new_rejects_invalid_enum() {
 #[test]
 fn test_list_shows_artifacts() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "First",
-            "--project", "alpha",
-            "--priority", "20",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "First",
+            "--project",
+            "alpha",
+            "--priority",
+            "20",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
-    ark().args([
-            "new", "task",
-            "--title", "Second",
-            "--project", "beta",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Second",
+            "--project",
+            "beta",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
     // Default list shows both, sorted by priority
-    ark().args(["list", "task"])
+    ark()
+        .args(["list", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -185,7 +212,8 @@ fn test_list_shows_artifacts() {
         .stdout(predicate::str::contains("Second"));
 
     // Filter by project
-    ark().args(["list", "task", "--project", "alpha"])
+    ark()
+        .args(["list", "task", "--project", "alpha"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -196,17 +224,23 @@ fn test_list_shows_artifacts() {
 #[test]
 fn test_tsv_output() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "TSV test",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "TSV test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["-F", "tsv", "list", "task"])
+    ark()
+        .args(["-F", "tsv", "list", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -217,22 +251,29 @@ fn test_tsv_output() {
 #[test]
 fn test_edit_updates_field() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Edit me",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Edit me",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["edit", "BL-001", "--status", "active"])
+    ark()
+        .args(["edit", "BL-001", "--status", "active"])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["show", "BL-001"])
+    ark()
+        .args(["show", "BL-001"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -242,17 +283,23 @@ fn test_edit_updates_field() {
 #[test]
 fn test_lint_passes_valid_artifacts() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Valid task",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Valid task",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["lint", "task"])
+    ark()
+        .args(["lint", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -262,11 +309,16 @@ fn test_lint_passes_valid_artifacts() {
 #[test]
 fn test_lint_catches_invalid_enum() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Will be broken",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Will be broken",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -284,7 +336,8 @@ fn test_lint_catches_invalid_enum() {
     let corrupted = content.replace("status: backlog", "status: invalid");
     fs::write(&file, corrupted).unwrap();
 
-    ark().args(["lint", "task"])
+    ark()
+        .args(["lint", "task"])
         .current_dir(dir.path())
         .assert()
         .failure();
@@ -293,22 +346,29 @@ fn test_lint_catches_invalid_enum() {
 #[test]
 fn test_archive_moves_done_items() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "To archive",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "To archive",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["edit", "BL-001", "--status", "done"])
+    ark()
+        .args(["edit", "BL-001", "--status", "done"])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["archive", "task"])
+    ark()
+        .args(["archive", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -326,23 +386,30 @@ fn test_archive_moves_done_items() {
 #[test]
 fn test_search_finds_matches() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Build prototype XYZ",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Build prototype XYZ",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["search", "XYZ"])
+    ark()
+        .args(["search", "XYZ"])
         .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("BL-001"));
 
-    ark().args(["search", "nonexistent"])
+    ark()
+        .args(["search", "nonexistent"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -353,7 +420,8 @@ fn test_search_finds_matches() {
 fn test_schema_help() {
     let dir = TempDir::new().unwrap();
     ark().arg("init").current_dir(dir.path()).assert().success();
-    ark().arg("schema-help")
+    ark()
+        .arg("schema-help")
         .current_dir(dir.path())
         .assert()
         .success()
@@ -364,33 +432,45 @@ fn test_schema_help() {
 #[test]
 fn test_rebalance() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "First",
-            "--project", "alpha",
-            "--priority", "5",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "First",
+            "--project",
+            "alpha",
+            "--priority",
+            "5",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
-    ark().args([
-            "new", "task",
-            "--title", "Second",
-            "--project", "alpha",
-            "--priority", "7",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Second",
+            "--project",
+            "alpha",
+            "--priority",
+            "7",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["rebalance", "task"])
+    ark()
+        .args(["rebalance", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Rebalanced"));
 
     // After rebalance, priorities should be 10, 20
-    ark().args(["-F", "tsv", "list", "task"])
+    ark()
+        .args(["-F", "tsv", "list", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -402,10 +482,14 @@ fn test_rebalance() {
 fn test_new_rejects_missing_required_fields() {
     let dir = setup_project();
     // Missing --project which is required
-    ark().args([
-            "new", "task",
-            "--title", "Incomplete task",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Incomplete task",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -416,21 +500,31 @@ fn test_new_rejects_missing_required_fields() {
 #[test]
 fn test_new_rejects_duplicate_priority() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "First task",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "First task",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args([
-            "new", "task",
-            "--title", "Dupe priority",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Dupe priority",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -442,12 +536,18 @@ fn test_new_rejects_duplicate_priority() {
 fn test_set_validates_against_schema() {
     let dir = setup_project();
     // --set on a derived field should fail
-    ark().args([
-            "new", "task",
-            "--title", "Test set validation",
-            "--project", "alpha",
-            "--priority", "10",
-            "--set", "id=FAKE-999",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test set validation",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "id=FAKE-999",
         ])
         .current_dir(dir.path())
         .assert()
@@ -458,17 +558,23 @@ fn test_set_validates_against_schema() {
 #[test]
 fn test_edit_noop_no_changes() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "No-op test",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "No-op test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["edit", "BL-001"])
+    ark()
+        .args(["edit", "BL-001"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -478,11 +584,16 @@ fn test_edit_noop_no_changes() {
 #[test]
 fn test_parent_directory_walk() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Walk test",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Walk test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
@@ -492,7 +603,8 @@ fn test_parent_directory_walk() {
     let subdir = dir.path().join("subdir");
     fs::create_dir(&subdir).unwrap();
 
-    ark().args(["list", "task"])
+    ark()
+        .args(["list", "task"])
         .current_dir(&subdir)
         .assert()
         .success()
@@ -502,30 +614,38 @@ fn test_parent_directory_walk() {
 #[test]
 fn test_colon_in_title_roundtrip() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Fix: colon handling",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Fix: colon handling",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
     // Verify it survives a show
-    ark().args(["show", "BL-001"])
+    ark()
+        .args(["show", "BL-001"])
         .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("Fix: colon handling"));
 
     // Edit and verify it still survives
-    ark().args(["edit", "BL-001", "--status", "active"])
+    ark()
+        .args(["edit", "BL-001", "--status", "active"])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["show", "BL-001"])
+    ark()
+        .args(["show", "BL-001"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -535,31 +655,43 @@ fn test_colon_in_title_roundtrip() {
 #[test]
 fn test_next_command() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "Active item",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Active item",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
-    ark().args([
-            "new", "task",
-            "--title", "Queued item",
-            "--project", "alpha",
-            "--priority", "20",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Queued item",
+            "--project",
+            "alpha",
+            "--priority",
+            "20",
         ])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["edit", "BL-001", "--status", "active"])
+    ark()
+        .args(["edit", "BL-001", "--status", "active"])
         .current_dir(dir.path())
         .assert()
         .success();
 
-    ark().args(["next", "task"])
+    ark()
+        .args(["next", "task"])
         .current_dir(dir.path())
         .assert()
         .success()
@@ -570,11 +702,16 @@ fn test_next_command() {
 #[test]
 fn test_show_json_format() {
     let dir = setup_project();
-    ark().args([
-            "new", "task",
-            "--title", "JSON test",
-            "--project", "alpha",
-            "--priority", "10",
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "JSON test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
         ])
         .current_dir(dir.path())
         .assert()

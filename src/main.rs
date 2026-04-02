@@ -27,7 +27,12 @@ fn main() -> Result<()> {
 
         Command::Fields(args) => {
             let root = find_ark_root(&cwd)?;
-            commands::fields::run(&root, &args.artifact_type, args.field.as_deref(), &cli.format)
+            commands::fields::run(
+                &root,
+                &args.artifact_type,
+                args.field.as_deref(),
+                &cli.format,
+            )
         }
 
         Command::List(args) => {

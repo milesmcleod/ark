@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use gray_matter::engine::YAML;
 use gray_matter::Matter;
+use gray_matter::engine::YAML;
 
 use crate::schema::Schema;
 
@@ -26,15 +26,15 @@ impl Artifact {
     /// Parse a string into an Artifact
     pub fn from_str(content: &str, path: PathBuf) -> Result<Self> {
         let matter = Matter::<YAML>::new();
-        let parsed = matter.parse(content).unwrap_or_else(|_| {
-            gray_matter::ParsedEntity {
+        let parsed = matter
+            .parse(content)
+            .unwrap_or_else(|_| gray_matter::ParsedEntity {
                 data: None,
                 content: content.to_string(),
                 excerpt: None,
                 orig: content.to_string(),
                 matter: String::new(),
-            }
-        });
+            });
 
         let frontmatter = if let Some(data) = parsed.data {
             pod_to_map(&data)
@@ -68,10 +68,6 @@ impl Artifact {
 
     pub fn get_str(&self, key: &str) -> Option<&str> {
         self.frontmatter.get(key).and_then(|v| v.as_str())
-    }
-
-    pub fn get_i64(&self, key: &str) -> Option<i64> {
-        self.frontmatter.get(key).and_then(|v| v.as_i64())
     }
 
     pub fn get_list(&self, key: &str) -> Vec<String> {
@@ -113,7 +109,7 @@ impl Artifact {
 pub fn load_artifacts(ark_root: &Path, schema: &Schema) -> Result<Vec<Artifact>> {
     let dir = ark_root.join(&schema.directory);
     if !dir.is_dir() {
-        return Ok(Vec::new())
+        return Ok(Vec::new());
     }
 
     let mut artifacts = Vec::new();
@@ -123,7 +119,11 @@ pub fn load_artifacts(ark_root: &Path, schema: &Schema) -> Result<Vec<Artifact>>
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && path.extension().is_some_and(|e| e == "md" || e == "feature") {
+        if path.is_file()
+            && path
+                .extension()
+                .is_some_and(|e| e == "md" || e == "feature")
+        {
             match Artifact::from_file(&path) {
                 Ok(artifact) => artifacts.push(artifact),
                 Err(e) => {
@@ -184,12 +184,12 @@ fn pod_to_json(pod: &gray_matter::Pod) -> serde_json::Value {
         Pod::Integer(i) => serde_json::json!(i),
         Pod::Float(f) => serde_json::json!(f),
         Pod::Boolean(b) => serde_json::Value::Bool(*b),
-        Pod::Array(arr) => {
-            serde_json::Value::Array(arr.iter().map(pod_to_json).collect())
-        }
+        Pod::Array(arr) => serde_json::Value::Array(arr.iter().map(pod_to_json).collect()),
         Pod::Hash(map) => {
-            let obj: serde_json::Map<String, serde_json::Value> =
-                map.iter().map(|(k, v)| (k.clone(), pod_to_json(v))).collect();
+            let obj: serde_json::Map<String, serde_json::Value> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), pod_to_json(v)))
+                .collect();
             serde_json::Value::Object(obj)
         }
     }
@@ -198,7 +198,9 @@ fn pod_to_json(pod: &gray_matter::Pod) -> serde_json::Value {
 /// Serialize frontmatter HashMap to YAML string
 fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> String {
     // Preserve a sensible field order: id, title, status, priority, then rest alphabetically
-    let priority_keys = ["id", "title", "status", "priority", "project", "type", "tags", "created", "updated"];
+    let priority_keys = [
+        "id", "title", "status", "priority", "project", "type", "tags", "created", "updated",
+    ];
     let mut lines = Vec::new();
 
     for key in &priority_keys {
@@ -225,35 +227,49 @@ fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> Stri
 /// Check if a string value needs quoting in YAML output
 fn needs_yaml_quoting(s: &str) -> bool {
     if s.is_empty() {
-        return true
+        return true;
     }
     // Quote if it contains YAML-special characters
-    if s.contains(':') || s.contains('#') || s.contains('[') || s.contains(']')
-        || s.contains('{') || s.contains('}') || s.contains('"') || s.contains('\'')
-        || s.contains('|') || s.contains('>') || s.contains('&') || s.contains('*')
-        || s.contains('!') || s.contains('%') || s.contains('@') || s.contains('`')
+    if s.contains(':')
+        || s.contains('#')
+        || s.contains('[')
+        || s.contains(']')
+        || s.contains('{')
+        || s.contains('}')
+        || s.contains('"')
+        || s.contains('\'')
+        || s.contains('|')
+        || s.contains('>')
+        || s.contains('&')
+        || s.contains('*')
+        || s.contains('!')
+        || s.contains('%')
+        || s.contains('@')
+        || s.contains('`')
         || s.contains(',')
     {
-        return true
+        return true;
     }
     // Quote if it starts with whitespace or special leading chars
     let first = s.chars().next().unwrap();
     if first.is_whitespace() || first == '-' || first == '?' {
-        return true
+        return true;
     }
     // Quote YAML booleans and null
     let lower = s.to_lowercase();
-    if matches!(lower.as_str(), "true" | "false" | "yes" | "no" | "null" | "~"
-        | "on" | "off" | "y" | "n") {
-        return true
+    if matches!(
+        lower.as_str(),
+        "true" | "false" | "yes" | "no" | "null" | "~" | "on" | "off" | "y" | "n"
+    ) {
+        return true;
     }
     // Quote if it parses as a number (would be interpreted as int/float by YAML)
     if s.parse::<i64>().is_ok() || s.parse::<f64>().is_ok() {
-        return true
+        return true;
     }
     // Quote if it contains newlines
     if s.contains('\n') || s.contains('\r') {
-        return true
+        return true;
     }
     false
 }
@@ -269,7 +285,11 @@ fn format_yaml_field(key: &str, value: &serde_json::Value) -> String {
         }
         serde_json::Value::String(s) => {
             if needs_yaml_quoting(s) {
-                format!("{}: \"{}\"\n", key, s.replace('\\', "\\\\").replace('"', "\\\""))
+                format!(
+                    "{}: \"{}\"\n",
+                    key,
+                    s.replace('\\', "\\\\").replace('"', "\\\"")
+                )
             } else {
                 format!("{}: {}\n", key, s)
             }
@@ -324,7 +344,10 @@ This is the body.
 
     #[test]
     fn test_slugify() {
-        assert_eq!(slugify("Build Bellflower Prototype"), "build-bellflower-prototype");
+        assert_eq!(
+            slugify("Build Bellflower Prototype"),
+            "build-bellflower-prototype"
+        );
         assert_eq!(slugify("Fix bug #42"), "fix-bug-42");
         assert_eq!(slugify("  lots   of   spaces  "), "lots-of-spaces");
     }

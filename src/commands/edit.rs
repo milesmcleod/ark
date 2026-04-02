@@ -69,9 +69,10 @@ pub fn run(ark_root: &Path, args: &EditArgs) -> Result<()> {
             // Apply --set key=value fields (validated and type-coerced against schema)
             for (key, value) in &args.fields {
                 validate_field_value(schema, key, value)?;
-                updated
-                    .frontmatter
-                    .insert(key.clone(), crate::validate::coerce_value(schema, key, value));
+                updated.frontmatter.insert(
+                    key.clone(),
+                    crate::validate::coerce_value(schema, key, value),
+                );
                 changed = true;
             }
 

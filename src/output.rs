@@ -1,17 +1,12 @@
 use comfy_table::presets::UTF8_FULL_CONDENSED;
 use comfy_table::{Cell, ContentArrangement, Table};
 
-#[derive(Debug, Clone, clap::ValueEnum)]
+#[derive(Debug, Clone, Default, clap::ValueEnum)]
 pub enum OutputFormat {
+    #[default]
     Pretty,
     Tsv,
     Json,
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        Self::Pretty
-    }
 }
 
 /// Render tabular data in the requested format
@@ -25,7 +20,7 @@ pub fn render_table(headers: &[&str], rows: Vec<Vec<String>>, format: &OutputFor
 
 fn render_pretty(headers: &[&str], rows: Vec<Vec<String>>) -> String {
     if rows.is_empty() {
-        return String::new()
+        return String::new();
     }
 
     let mut table = Table::new();
@@ -34,7 +29,7 @@ fn render_pretty(headers: &[&str], rows: Vec<Vec<String>>) -> String {
     table.set_header(headers.iter().map(|h| Cell::new(h.to_uppercase())));
 
     for row in rows {
-        table.add_row(row.iter().map(|c| Cell::new(c)));
+        table.add_row(row.iter().map(Cell::new));
     }
 
     table.to_string()
@@ -55,7 +50,7 @@ fn render_json(headers: &[&str], rows: Vec<Vec<String>>) -> String {
         .map(|row| {
             headers
                 .iter()
-                .zip(row.into_iter())
+                .zip(row)
                 .map(|(h, v)| (h.to_string(), serde_json::Value::String(v)))
                 .collect()
         })

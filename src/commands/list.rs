@@ -4,8 +4,8 @@ use anyhow::Result;
 
 use crate::artifact::load_artifacts;
 use crate::cli::ListArgs;
-use crate::output::{render_table, OutputFormat};
-use crate::schema::{load_schema, FieldType};
+use crate::output::{OutputFormat, render_table};
+use crate::schema::{FieldType, load_schema};
 
 pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()> {
     let schema = load_schema(ark_root, &args.artifact_type)?;
@@ -27,8 +27,7 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
         // Filter by the 'kind' flag which maps to whatever enum-like field
         // the user intends. Check common field names.
         artifacts.retain(|a| {
-            a.get_str("type") == Some(kind.as_str())
-                || a.get_str("kind") == Some(kind.as_str())
+            a.get_str("type") == Some(kind.as_str()) || a.get_str("kind") == Some(kind.as_str())
         });
     }
     if let Some(ref tag) = args.tag {
@@ -50,7 +49,7 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
     if artifacts.is_empty() {
         let type_name = &args.artifact_type;
         println!("No {type_name} artifacts found. Create one with `ark new {type_name}`.");
-        return Ok(())
+        return Ok(());
     }
 
     // Build display columns dynamically from schema fields
@@ -60,10 +59,7 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
         .fields
         .iter()
         .filter(|f| {
-            !f.derived
-                && f.name != "id"
-                && f.name != "title"
-                && f.field_type != FieldType::List
+            !f.derived && f.name != "id" && f.name != "title" && f.field_type != FieldType::List
         })
         .collect();
 
@@ -86,11 +82,7 @@ pub fn run(ark_root: &Path, args: &ListArgs, format: &OutputFormat) -> Result<()
         .map(|a| {
             let mut row = vec![a.id().unwrap_or("-").to_string()];
             if schema.priority_field().is_some() {
-                row.push(
-                    a.priority()
-                        .map(|p| p.to_string())
-                        .unwrap_or("-".into()),
-                );
+                row.push(a.priority().map(|p| p.to_string()).unwrap_or("-".into()));
             }
             for field in &display_fields {
                 if field.name == "priority" {

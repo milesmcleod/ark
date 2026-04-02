@@ -16,15 +16,6 @@ pub enum ArkError {
         path: PathBuf,
         message: String,
     },
-    DuplicateId {
-        id: String,
-        path1: PathBuf,
-        path2: PathBuf,
-    },
-    ValidationError {
-        path: PathBuf,
-        message: String,
-    },
 }
 
 impl fmt::Display for ArkError {
@@ -40,7 +31,10 @@ impl fmt::Display for ArkError {
                 "no schemas defined in .ark/schemas/. Create schema files to define artifact types."
             ),
             Self::UnknownType(t) => {
-                write!(f, "unknown artifact type: {t}. Run `ark types` to see available types.")
+                write!(
+                    f,
+                    "unknown artifact type: {t}. Run `ark types` to see available types."
+                )
             }
             Self::UnknownField {
                 artifact_type,
@@ -52,15 +46,6 @@ impl fmt::Display for ArkError {
             Self::ArtifactNotFound(id) => write!(f, "artifact not found: {id}"),
             Self::SchemaError { path, message } => {
                 write!(f, "schema error in {}: {message}", path.display())
-            }
-            Self::DuplicateId { id, path1, path2 } => write!(
-                f,
-                "duplicate ID: {id} found in {} and {}",
-                path1.display(),
-                path2.display()
-            ),
-            Self::ValidationError { path, message } => {
-                write!(f, "validation error in {}: {message}", path.display())
             }
         }
     }

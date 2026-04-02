@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::Local;
 
-use crate::artifact::{load_artifacts, next_id, slugify, Artifact};
+use crate::artifact::{Artifact, load_artifacts, next_id, slugify};
 use crate::cli::NewArgs;
 use crate::schema::load_schema;
 use crate::validate::{validate_field_value, validate_required_fields, validate_unique_priority};
@@ -41,10 +41,10 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     if let Some(ref status) = args.status {
         validate_field_value(&schema, "status", status)?;
         frontmatter.insert("status".into(), serde_json::Value::String(status.clone()));
-    } else if let Some(field) = schema.get_field("status") {
-        if let Some(ref default) = field.default {
-            frontmatter.insert("status".into(), default.clone());
-        }
+    } else if let Some(field) = schema.get_field("status")
+        && let Some(ref default) = field.default
+    {
+        frontmatter.insert("status".into(), default.clone());
     }
 
     // Set priority
@@ -62,10 +62,7 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     // Set type (via --kind flag)
     if let Some(ref item_type) = args.kind {
         validate_field_value(&schema, "type", item_type)?;
-        frontmatter.insert(
-            "type".into(),
-            serde_json::Value::String(item_type.clone()),
-        );
+        frontmatter.insert("type".into(), serde_json::Value::String(item_type.clone()));
     }
 
     // Set tags
@@ -84,7 +81,10 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
     if let Some(ref extras) = args.extra_fields {
         for (key, value) in extras {
             validate_field_value(&schema, key, value)?;
-            frontmatter.insert(key.clone(), crate::validate::coerce_value(&schema, key, value));
+            frontmatter.insert(
+                key.clone(),
+                crate::validate::coerce_value(&schema, key, value),
+            );
         }
     }
 

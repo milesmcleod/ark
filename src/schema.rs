@@ -69,10 +69,6 @@ impl Schema {
         self.get_field("priority")
     }
 
-    pub fn status_field(&self) -> Option<&FieldDef> {
-        self.get_field("status")
-    }
-
     pub fn archive_value(&self) -> Option<&str> {
         self.archive.as_ref().map(|a| a.value.as_str())
     }
@@ -109,7 +105,10 @@ impl Schema {
                         s.insert(
                             "enum".into(),
                             serde_json::Value::Array(
-                                values.iter().map(|v| serde_json::Value::String(v.clone())).collect(),
+                                values
+                                    .iter()
+                                    .map(|v| serde_json::Value::String(v.clone()))
+                                    .collect(),
                             ),
                         );
                     }
@@ -144,7 +143,7 @@ pub fn find_ark_root(start: &Path) -> Result<PathBuf> {
     loop {
         let ark_dir = current.join(".ark");
         if ark_dir.is_dir() {
-            return Ok(current)
+            return Ok(current);
         }
         if !current.pop() {
             break;
@@ -161,8 +160,12 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
     }
 
     let mut schemas = HashMap::new();
-    let entries = std::fs::read_dir(&schemas_dir)
-        .with_context(|| format!("failed to read schemas directory: {}", schemas_dir.display()))?;
+    let entries = std::fs::read_dir(&schemas_dir).with_context(|| {
+        format!(
+            "failed to read schemas directory: {}",
+            schemas_dir.display()
+        )
+    })?;
 
     for entry in entries {
         let entry = entry?;
@@ -170,12 +173,11 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
         if path.extension().is_some_and(|e| e == "yml" || e == "yaml") {
             let content = std::fs::read_to_string(&path)
                 .with_context(|| format!("failed to read schema: {}", path.display()))?;
-            let schema: Schema = serde_yml::from_str(&content).map_err(|e| {
-                ArkError::SchemaError {
+            let schema: Schema =
+                serde_yml::from_str(&content).map_err(|e| ArkError::SchemaError {
                     path: path.clone(),
                     message: e.to_string(),
-                }
-            })?;
+                })?;
             schemas.insert(schema.name.clone(), schema);
         }
     }
@@ -194,7 +196,9 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
             if dir_a == dir_b {
                 anyhow::bail!(
                     "schema conflict: '{}' and '{}' both use directory '{}'. Each artifact type must have its own directory.",
-                    name_a, name_b, dir_a
+                    name_a,
+                    name_b,
+                    dir_a
                 );
             }
         }
