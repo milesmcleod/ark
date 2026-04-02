@@ -236,14 +236,39 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
     Ok(schemas)
 }
 
-/// Load a single schema by artifact type name
+/// Load a single schema by artifact type name.
+/// Scans schema files individually to avoid loading all schemas.
 pub fn load_schema(ark_root: &Path, type_name: &str) -> Result<Schema> {
-    let schemas = load_schemas(ark_root)?;
-    schemas
-        .into_iter()
-        .find(|(name, _)| name == type_name)
-        .map(|(_, schema)| schema)
-        .ok_or_else(|| ArkError::UnknownType(type_name.to_string()).into())
+    let schemas_dir = ark_root.join(".ark").join("schemas");
+    if !schemas_dir.is_dir() {
+        return Err(ArkError::NoSchemas.into());
+    }
+
+    let entries = std::fs::read_dir(&schemas_dir).with_context(|| {
+        format!(
+            "failed to read schemas directory: {}",
+            schemas_dir.display()
+        )
+    })?;
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "yml" || e == "yaml") {
+            let content = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read schema: {}", path.display()))?;
+            let schema: Schema =
+                serde_yml::from_str(&content).map_err(|e| ArkError::SchemaError {
+                    path: path.clone(),
+                    message: e.to_string(),
+                })?;
+            if schema.name == type_name {
+                return Ok(schema);
+            }
+        }
+    }
+
+    Err(ArkError::UnknownType(type_name.to_string()).into())
 }
 
 #[cfg(test)]

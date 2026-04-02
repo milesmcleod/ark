@@ -941,6 +941,39 @@ fn test_scan_next_shows_cross_project_queue() {
         .stdout(predicate::str::contains("project-c"));
 }
 
+#[test]
+fn test_arkignore_excludes_directories() {
+    let root = setup_multi_project();
+
+    // Create .arkignore that excludes project-c
+    fs::write(root.path().join(".arkignore"), "project-c\n").unwrap();
+
+    // scan types should not include project-c
+    ark()
+        .args(["scan", "types"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("project-a"))
+        .stdout(predicate::str::contains("project-b"))
+        .stdout(predicate::str::contains("project-c").not());
+}
+
+#[test]
+fn test_arkignore_glob_patterns() {
+    let root = setup_multi_project();
+
+    // Exclude all projects starting with "project-"
+    fs::write(root.path().join(".arkignore"), "project-*\n").unwrap();
+
+    ark()
+        .args(["scan", "types"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("project-a").not());
+}
+
 // --- Coverage gap tests ---
 
 #[test]
@@ -967,7 +1000,7 @@ fn test_numeric_title_roundtrip() {
         .current_dir(dir.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("title: \"42\""));
+        .stdout(predicate::str::contains("title: '42'"));
 
     ark()
         .args(["edit", "BL-001", "--status", "active"])
@@ -980,7 +1013,7 @@ fn test_numeric_title_roundtrip() {
         .current_dir(dir.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("title: \"42\""));
+        .stdout(predicate::str::contains("title: '42'"));
 }
 
 #[test]

@@ -60,7 +60,7 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
             FieldType::String => {
                 // Validate pattern if present
                 if let Some(ref pattern) = field.pattern
-                    && let Ok(re) = regex_lite::Regex::new(pattern)
+                    && let Ok(re) = regex::Regex::new(pattern)
                     && !re.is_match(value)
                 {
                     bail!(

@@ -195,21 +195,26 @@ fn pod_to_json(pod: &gray_matter::Pod) -> serde_json::Value {
     }
 }
 
-/// Serialize frontmatter HashMap to YAML string
+/// Serialize frontmatter HashMap to YAML string using serde_yml.
+/// We control field ordering; serde_yml handles all quoting and escaping.
 fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> String {
-    // Preserve a sensible field order: id, title, status, priority, then rest alphabetically
+    use serde_yml::Value as YamlValue;
+
+    // Build an ordered mapping
+    let mut mapping = serde_yml::Mapping::new();
+
+    // Priority keys first, in this order
     let priority_keys = [
         "id", "title", "status", "priority", "project", "type", "tags", "created", "updated",
     ];
-    let mut lines = Vec::new();
 
     for key in &priority_keys {
         if let Some(value) = frontmatter.get(*key) {
-            lines.push(format_yaml_field(key, value));
+            mapping.insert(YamlValue::String(key.to_string()), json_to_yaml(value));
         }
     }
 
-    // Any remaining keys not in the priority list
+    // Remaining keys alphabetically
     let mut remaining: Vec<_> = frontmatter
         .keys()
         .filter(|k| !priority_keys.contains(&k.as_str()))
@@ -217,90 +222,37 @@ fn frontmatter_to_yaml(frontmatter: &HashMap<String, serde_json::Value>) -> Stri
     remaining.sort();
     for key in remaining {
         if let Some(value) = frontmatter.get(key.as_str()) {
-            lines.push(format_yaml_field(key, value));
+            mapping.insert(YamlValue::String(key.to_string()), json_to_yaml(value));
         }
     }
 
-    lines.join("")
+    serde_yml::to_string(&mapping).unwrap_or_default()
 }
 
-/// Check if a string value needs quoting in YAML output
-fn needs_yaml_quoting(s: &str) -> bool {
-    if s.is_empty() {
-        return true;
-    }
-    // Quote if it contains YAML-special characters
-    if s.contains(':')
-        || s.contains('#')
-        || s.contains('[')
-        || s.contains(']')
-        || s.contains('{')
-        || s.contains('}')
-        || s.contains('"')
-        || s.contains('\'')
-        || s.contains('|')
-        || s.contains('>')
-        || s.contains('&')
-        || s.contains('*')
-        || s.contains('!')
-        || s.contains('%')
-        || s.contains('@')
-        || s.contains('`')
-        || s.contains(',')
-    {
-        return true;
-    }
-    // Quote if it starts with whitespace or special leading chars
-    let first = s.chars().next().unwrap();
-    if first.is_whitespace() || first == '-' || first == '?' {
-        return true;
-    }
-    // Quote YAML booleans and null
-    let lower = s.to_lowercase();
-    if matches!(
-        lower.as_str(),
-        "true" | "false" | "yes" | "no" | "null" | "~" | "on" | "off" | "y" | "n"
-    ) {
-        return true;
-    }
-    // Quote if it parses as a number (would be interpreted as int/float by YAML)
-    if s.parse::<i64>().is_ok() || s.parse::<f64>().is_ok() {
-        return true;
-    }
-    // Quote if it contains newlines
-    if s.contains('\n') || s.contains('\r') {
-        return true;
-    }
-    false
-}
-
-fn format_yaml_field(key: &str, value: &serde_json::Value) -> String {
+/// Convert a serde_json::Value to a serde_yml::Value
+fn json_to_yaml(value: &serde_json::Value) -> serde_yml::Value {
     match value {
-        serde_json::Value::Array(arr) => {
-            let items: Vec<String> = arr
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
-            format!("{}: [{}]\n", key, items.join(", "))
-        }
-        serde_json::Value::String(s) => {
-            if needs_yaml_quoting(s) {
-                format!(
-                    "{}: \"{}\"\n",
-                    key,
-                    s.replace('\\', "\\\\").replace('"', "\\\"")
-                )
+        serde_json::Value::Null => serde_yml::Value::Null,
+        serde_json::Value::Bool(b) => serde_yml::Value::Bool(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                serde_yml::Value::Number(i.into())
+            } else if let Some(f) = n.as_f64() {
+                serde_yml::Value::Number(serde_yml::Number::from(f))
             } else {
-                format!("{}: {}\n", key, s)
+                serde_yml::Value::String(n.to_string())
             }
         }
-        serde_json::Value::Number(n) => format!("{}: {}\n", key, n),
-        serde_json::Value::Bool(b) => format!("{}: {}\n", key, b),
-        serde_json::Value::Null => format!("{}: null\n", key),
-        serde_json::Value::Object(_) => {
-            // For nested objects, fall back to serde_yml
-            let yaml = serde_yml::to_string(value).unwrap_or_default();
-            format!("{}:\n{}", key, yaml)
+        serde_json::Value::String(s) => serde_yml::Value::String(s.clone()),
+        serde_json::Value::Array(arr) => {
+            serde_yml::Value::Sequence(arr.iter().map(json_to_yaml).collect())
+        }
+        serde_json::Value::Object(map) => {
+            let mut m = serde_yml::Mapping::new();
+            for (k, v) in map {
+                m.insert(serde_yml::Value::String(k.clone()), json_to_yaml(v));
+            }
+            serde_yml::Value::Mapping(m)
         }
     }
 }
@@ -415,17 +367,5 @@ Body here.
         let output = artifact.to_markdown();
         let reparsed = Artifact::from_str(&output, PathBuf::from("test.md")).unwrap();
         assert_eq!(reparsed.title(), Some("Something: with a colon"));
-    }
-
-    #[test]
-    fn test_yaml_quoting_special_chars() {
-        assert!(needs_yaml_quoting("has: colon"));
-        assert!(needs_yaml_quoting("has # hash"));
-        assert!(needs_yaml_quoting("[brackets]"));
-        assert!(needs_yaml_quoting("true"));
-        assert!(needs_yaml_quoting(""));
-        assert!(!needs_yaml_quoting("simple title"));
-        assert!(!needs_yaml_quoting("BL-001"));
-        assert!(!needs_yaml_quoting("2026-04-01"));
     }
 }

@@ -158,7 +158,7 @@ fn lint_artifact_with_validator(
     if let Some(id) = artifact.id() {
         if let Some(field) = schema.id_field()
             && let Some(ref pattern) = field.pattern
-            && let Ok(re) = regex_lite::Regex::new(pattern)
+            && let Ok(re) = regex::Regex::new(pattern)
             && !re.is_match(id)
         {
             report_error(

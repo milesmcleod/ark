@@ -12,8 +12,8 @@ pub fn run(
     artifact_type: Option<&str>,
     format: &OutputFormat,
 ) -> Result<()> {
-    let re = regex_lite::Regex::new(pattern)
-        .map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
+    let re =
+        regex::Regex::new(pattern).map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
 
     let schemas = if let Some(type_name) = artifact_type {
         let schema = load_schema(ark_root, type_name)?;

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::artifact::{Artifact, load_artifacts};
 use crate::schema::{self, Schema};
@@ -21,7 +22,7 @@ pub struct ProjectArtifact {
     pub artifact: Artifact,
 }
 
-/// Directories to skip during recursive discovery.
+/// Directories to always skip during recursive discovery.
 const SKIP_DIRS: &[&str] = &[
     ".git",
     "target",
@@ -34,22 +35,49 @@ const SKIP_DIRS: &[&str] = &[
     "venv",
 ];
 
-/// Recursively discover all ark projects below a root directory.
-/// Returns a list of ProjectInfo, one per discovered .ark/ directory.
-/// The root itself is included if it has .ark/.
-pub fn discover_projects(root: &Path) -> Result<Vec<ProjectInfo>> {
-    let mut projects = Vec::new();
-    discover_recursive(root, root, &mut projects)?;
+/// Load .arkignore patterns from a file. Returns an empty set if the file doesn't exist.
+fn load_arkignore(root: &Path) -> GlobSet {
+    let ignore_path = root.join(".arkignore");
+    let content = match std::fs::read_to_string(&ignore_path) {
+        Ok(c) => c,
+        Err(_) => return GlobSet::empty(),
+    };
 
-    // Sort by project name for stable output
+    let mut builder = GlobSetBuilder::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Ok(glob) = Glob::new(line) {
+            builder.add(glob);
+        } else {
+            eprintln!("  warning: invalid .arkignore pattern: {}", line);
+        }
+    }
+
+    builder.build().unwrap_or_else(|_| GlobSet::empty())
+}
+
+/// Recursively discover all ark projects below a root directory.
+/// Respects .arkignore at the scan root.
+pub fn discover_projects(root: &Path) -> Result<Vec<ProjectInfo>> {
+    let ignore = load_arkignore(root);
+    let mut projects = Vec::new();
+    discover_recursive(root, root, &ignore, &mut projects)?;
+
     projects.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(projects)
 }
 
-fn discover_recursive(dir: &Path, scan_root: &Path, projects: &mut Vec<ProjectInfo>) -> Result<()> {
+fn discover_recursive(
+    dir: &Path,
+    scan_root: &Path,
+    ignore: &GlobSet,
+    projects: &mut Vec<ProjectInfo>,
+) -> Result<()> {
     let ark_dir = dir.join(".ark");
     if ark_dir.is_dir() {
-        // This directory is an ark project
         let name = if dir == scan_root {
             ".".to_string()
         } else {
@@ -59,24 +87,18 @@ fn discover_recursive(dir: &Path, scan_root: &Path, projects: &mut Vec<ProjectIn
                 .to_string()
         };
 
-        match schema::load_schemas(dir) {
-            Ok(schemas) => {
-                projects.push(ProjectInfo {
-                    name,
-                    root: dir.to_path_buf(),
-                    schemas,
-                });
-            }
-            Err(_) => {
-                // .ark/ exists but no valid schemas - skip silently
-            }
+        if let Ok(schemas) = schema::load_schemas(dir) {
+            projects.push(ProjectInfo {
+                name,
+                root: dir.to_path_buf(),
+                schemas,
+            });
         }
     }
 
-    // Recurse into subdirectories
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
-        Err(_) => return Ok(()), // permission denied, broken symlink, etc.
+        Err(_) => return Ok(()),
     };
 
     for entry in entries {
@@ -92,7 +114,7 @@ fn discover_recursive(dir: &Path, scan_root: &Path, projects: &mut Vec<ProjectIn
         let dir_name = entry.file_name();
         let dir_name_str = dir_name.to_string_lossy();
 
-        // Skip hidden directories (except we already checked .ark above)
+        // Skip hidden directories
         if dir_name_str.starts_with('.') {
             continue;
         }
@@ -102,14 +124,22 @@ fn discover_recursive(dir: &Path, scan_root: &Path, projects: &mut Vec<ProjectIn
             continue;
         }
 
-        discover_recursive(&path, scan_root, projects)?;
+        // Skip directories matching .arkignore patterns
+        let relative = path
+            .strip_prefix(scan_root)
+            .unwrap_or(&path)
+            .to_string_lossy();
+        if ignore.is_match(relative.as_ref()) || ignore.is_match(dir_name_str.as_ref()) {
+            continue;
+        }
+
+        discover_recursive(&path, scan_root, ignore, projects)?;
     }
 
     Ok(())
 }
 
 /// Load all artifacts of matching type names across all discovered projects.
-/// `type_names` is a comma-separated list of schema names to match (e.g. "task,story,ticket").
 pub fn load_matching_artifacts(
     projects: &[ProjectInfo],
     type_names: &str,
@@ -124,7 +154,6 @@ pub fn load_matching_artifacts(
                     format!("failed to load {} artifacts from {}", name, project.name)
                 })?;
 
-                // Exclude archived items
                 let archive_value = schema.archive_value();
 
                 for artifact in artifacts {

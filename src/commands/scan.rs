@@ -288,8 +288,8 @@ pub fn run_search(
     type_filter: Option<&str>,
     format: &OutputFormat,
 ) -> Result<()> {
-    let re = regex_lite::Regex::new(pattern)
-        .map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
+    let re =
+        regex::Regex::new(pattern).map_err(|e| anyhow::anyhow!("invalid regex pattern: {}", e))?;
 
     let projects = discover_projects(cwd)?;
     let project_count = projects.len();

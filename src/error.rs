@@ -1,54 +1,30 @@
-use std::fmt;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ArkError {
+    #[error("not an ark project (no .ark/ directory found). Run `ark init` to set up.")]
     NotInitialized,
+
+    #[error("ark is already initialized in this directory")]
     AlreadyInitialized,
+
+    #[error("no schemas defined in .ark/schemas/. Create schema files to define artifact types.")]
     NoSchemas,
+
+    #[error("unknown artifact type: {0}. Run `ark types` to see available types.")]
     UnknownType(String),
+
+    #[error(
+        "unknown field '{field}' on artifact type '{artifact_type}'. Run `ark fields {artifact_type}` to see available fields."
+    )]
     UnknownField {
         artifact_type: String,
         field: String,
     },
+
+    #[error("artifact not found: {0}")]
     ArtifactNotFound(String),
-    SchemaError {
-        path: PathBuf,
-        message: String,
-    },
-}
 
-impl fmt::Display for ArkError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotInitialized => write!(
-                f,
-                "not an ark project (no .ark/ directory found). Run `ark init` to set up."
-            ),
-            Self::AlreadyInitialized => write!(f, "ark is already initialized in this directory"),
-            Self::NoSchemas => write!(
-                f,
-                "no schemas defined in .ark/schemas/. Create schema files to define artifact types."
-            ),
-            Self::UnknownType(t) => {
-                write!(
-                    f,
-                    "unknown artifact type: {t}. Run `ark types` to see available types."
-                )
-            }
-            Self::UnknownField {
-                artifact_type,
-                field,
-            } => write!(
-                f,
-                "unknown field '{field}' on artifact type '{artifact_type}'. Run `ark fields {artifact_type}` to see available fields."
-            ),
-            Self::ArtifactNotFound(id) => write!(f, "artifact not found: {id}"),
-            Self::SchemaError { path, message } => {
-                write!(f, "schema error in {}: {message}", path.display())
-            }
-        }
-    }
+    #[error("schema error in {}: {message}", path.display())]
+    SchemaError { path: PathBuf, message: String },
 }
-
-impl std::error::Error for ArkError {}
