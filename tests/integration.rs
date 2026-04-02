@@ -940,3 +940,174 @@ fn test_scan_next_shows_cross_project_queue() {
         .stdout(predicate::str::contains("project-a"))
         .stdout(predicate::str::contains("project-c"));
 }
+
+// --- Coverage gap tests ---
+
+#[test]
+fn test_numeric_title_roundtrip() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "42",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    // Title "42" should survive roundtrip (quoted in YAML, not parsed as integer)
+    ark()
+        .args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("title: \"42\""));
+
+    ark()
+        .args(["edit", "BL-001", "--status", "active"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["show", "BL-001"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("title: \"42\""));
+}
+
+#[test]
+fn test_stats_single_project() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "A",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "B",
+            "--project",
+            "beta",
+            "--priority",
+            "20",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["stats", "task", "--by", "project"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alpha"))
+        .stdout(predicate::str::contains("beta"));
+}
+
+#[test]
+fn test_newline_in_title_rejected() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "line1\nline2",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("newline"));
+}
+
+#[test]
+fn test_empty_title_rejected() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("empty"));
+}
+
+#[test]
+fn test_list_empty_shows_helpful_message() {
+    let dir = setup_project();
+    ark()
+        .args(["list", "task"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No task artifacts found"));
+}
+
+#[test]
+fn test_edit_rejects_invalid_enum() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["edit", "BL-001", "--status", "invalid_status"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
+fn test_show_not_found() {
+    let dir = setup_project();
+    ark()
+        .args(["show", "BL-999"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("artifact not found"));
+}
