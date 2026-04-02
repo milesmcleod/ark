@@ -1,7 +1,7 @@
 ---
 id: BL-019
 title: Schema registry - remote schema references
-status: active
+status: done
 priority: 160
 type: feature
 created: 2026-04-02
