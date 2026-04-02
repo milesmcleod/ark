@@ -2,35 +2,80 @@ name: adr
 directory: adr
 prefix: ADR
 fields:
-  - name: id
-    type: string
-    required: true
-    derived: true
-    pattern: "^ADR-\\d{3,}$"
-  - name: title
-    type: string
-    required: true
-  - name: status
-    type: enum
-    required: true
-    values: [proposed, accepted, deprecated, superseded]
-    default: proposed
-  - name: date
-    type: date
-    required: true
-  - name: supersedes
-    type: string
-  - name: tags
-    type: list
-  - name: created
-    type: date
-    derived: true
-  - name: updated
-    type: date
-    derived: true
+- name: id
+  type: string
+  required: true
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: ^ADR-\d{3,}$
+- name: title
+  type: string
+  required: true
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: status
+  type: enum
+  required: true
+  unique: false
+  derived: false
+  default: proposed
+  values:
+  - proposed
+  - accepted
+  - deprecated
+  - superseded
+  pattern: null
+- name: date
+  type: date
+  required: true
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: supersedes
+  type: string
+  required: false
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: tags
+  type: list
+  required: false
+  unique: false
+  derived: false
+  default: null
+  values: null
+  pattern: null
+- name: created
+  type: date
+  required: false
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: null
+- name: updated
+  type: date
+  required: false
+  unique: false
+  derived: true
+  default: null
+  values: null
+  pattern: null
+archive: null
 template: |
   ## Context
 
   ## Decision
 
   ## Consequences
+extends: null
+registry: https://raw.githubusercontent.com/milesmcleod/ark-schemas/main/adr.yml
