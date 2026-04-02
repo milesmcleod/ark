@@ -130,6 +130,87 @@ pub fn run_list(
     Ok(())
 }
 
+/// ark scan next <types> - show active and top queued items across all projects
+pub fn run_next(cwd: &Path, type_names: &str, count: usize, format: &OutputFormat) -> Result<()> {
+    let projects = discover_projects(cwd)?;
+    let artifacts = load_matching_artifacts(&projects, type_names)?;
+
+    let active: Vec<_> = artifacts
+        .iter()
+        .filter(|pa| pa.artifact.status() == Some("active"))
+        .collect();
+
+    let mut queued: Vec<_> = artifacts
+        .iter()
+        .filter(|pa| {
+            let status = pa.artifact.status().unwrap_or("");
+            status != "active" && status != "blocked" && status != "done"
+        })
+        .collect();
+
+    queued.sort_by(|a, b| {
+        let pa = a.artifact.priority().unwrap_or(i64::MAX);
+        let pb = b.artifact.priority().unwrap_or(i64::MAX);
+        pa.cmp(&pb)
+    });
+    queued.truncate(count);
+
+    if active.is_empty() && queued.is_empty() {
+        println!(
+            "No active or queued artifacts of type(s) '{}' found across {} projects.",
+            type_names,
+            projects.len()
+        );
+        return Ok(());
+    }
+
+    if !active.is_empty() {
+        println!("Active:");
+        let headers = &["project", "id", "pri", "title"];
+        let rows: Vec<Vec<String>> = active
+            .iter()
+            .map(|pa| {
+                vec![
+                    pa.project.clone(),
+                    pa.artifact.id().unwrap_or("-").into(),
+                    pa.artifact
+                        .priority()
+                        .map(|p| p.to_string())
+                        .unwrap_or("-".into()),
+                    pa.artifact.title().unwrap_or("-").into(),
+                ]
+            })
+            .collect();
+        println!("{}", render_table(headers, rows, format));
+    }
+
+    if !queued.is_empty() {
+        if !active.is_empty() {
+            println!();
+        }
+        println!("Up next:");
+        let headers = &["project", "id", "pri", "status", "title"];
+        let rows: Vec<Vec<String>> = queued
+            .iter()
+            .map(|pa| {
+                vec![
+                    pa.project.clone(),
+                    pa.artifact.id().unwrap_or("-").into(),
+                    pa.artifact
+                        .priority()
+                        .map(|p| p.to_string())
+                        .unwrap_or("-".into()),
+                    pa.artifact.status().unwrap_or("-").into(),
+                    pa.artifact.title().unwrap_or("-").into(),
+                ]
+            })
+            .collect();
+        println!("{}", render_table(headers, rows, format));
+    }
+
+    Ok(())
+}
+
 /// ark scan stats - aggregate statistics across all projects
 pub fn run_stats(
     cwd: &Path,

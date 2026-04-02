@@ -927,3 +927,16 @@ fn test_scan_lint_validates_all() {
         .success()
         .stdout(predicate::str::contains("3 projects"));
 }
+
+#[test]
+fn test_scan_next_shows_cross_project_queue() {
+    let root = setup_multi_project();
+    ark()
+        .args(["scan", "next", "task"])
+        .current_dir(root.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Up next:"))
+        .stdout(predicate::str::contains("project-a"))
+        .stdout(predicate::str::contains("project-c"));
+}

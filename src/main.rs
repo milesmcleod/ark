@@ -106,6 +106,9 @@ fn main() -> Result<()> {
                 scan_args.limit,
                 &cli.format,
             ),
+            cli::ScanCommand::Next(scan_args) => {
+                commands::scan::run_next(&cwd, &scan_args.types, scan_args.count, &cli.format)
+            }
             cli::ScanCommand::Stats(scan_args) => commands::scan::run_stats(
                 &cwd,
                 scan_args.types.as_deref(),

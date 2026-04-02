@@ -250,6 +250,9 @@ pub enum ScanCommand {
     /// List artifacts of matching types across all projects
     List(ScanListArgs),
 
+    /// Show active and top queued items across all projects
+    Next(ScanNextArgs),
+
     /// Show aggregate statistics across all projects
     Stats(ScanStatsArgs),
 
@@ -276,6 +279,16 @@ pub struct ScanListArgs {
     /// Maximum number of items
     #[arg(long, short = 'n')]
     pub limit: Option<usize>,
+}
+
+#[derive(clap::Args)]
+pub struct ScanNextArgs {
+    /// Artifact type(s) to match, comma-separated (e.g. "task,story,ticket")
+    pub types: String,
+
+    /// Number of queued items to show per project (default: 3)
+    #[arg(long, short = 'n', default_value = "3")]
+    pub count: usize,
 }
 
 #[derive(clap::Args)]
