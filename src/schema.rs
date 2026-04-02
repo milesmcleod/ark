@@ -333,8 +333,11 @@ pub fn load_schemas(ark_root: &Path) -> Result<HashMap<String, Schema>> {
     }
 
     // Validate no overlapping directories between schemas
+    // Skip schemas that serve only as inheritance bases (have children that extend them)
+    let base_names: HashSet<String> = schemas.values().filter_map(|s| s.extends.clone()).collect();
     let dirs: Vec<(&str, &str)> = schemas
         .values()
+        .filter(|s| !base_names.contains(&s.name))
         .map(|s| (s.name.as_str(), s.directory.as_str()))
         .collect();
     for (i, (name_a, dir_a)) in dirs.iter().enumerate() {
