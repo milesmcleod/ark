@@ -76,9 +76,22 @@ pub fn run(ark_root: &Path, target: Option<&str>) -> Result<()> {
 }
 
 fn lint_type(ark_root: &Path, schema: &Schema) -> Result<(usize, usize, usize)> {
-    let artifacts = load_artifacts(ark_root, schema)?;
+    let mut artifacts = load_artifacts(ark_root, schema)?;
     let mut total_errors = 0;
     let mut total_warnings = 0;
+
+    // Auto-fix supersession status drift: when an artifact declares
+    // `supersedes: <ID>`, the target artifact's status must be
+    // `superseded`. Only runs if the schema defines both a
+    // `supersedes` field and a `status` field with `superseded` as
+    // a valid value. Re-loads `artifacts` after writes so downstream
+    // checks see the corrected state.
+    let fixes = enforce_supersession_status(&mut artifacts, schema)?;
+    if fixes > 0 {
+        // Re-read from disk to pick up the new statuses for any
+        // subsequent checks below.
+        artifacts = load_artifacts(ark_root, schema)?;
+    }
 
     // Check for duplicate IDs
     let mut seen_ids: std::collections::HashMap<String, &std::path::Path> =
@@ -181,6 +194,121 @@ fn lint_artifact_with_validator(
     }
 
     (errors, warnings)
+}
+
+/// Auto-fix supersession status drift.
+///
+/// When an artifact declares `supersedes: <ID>` in its frontmatter,
+/// the target artifact's `status` field must be `superseded`. Lint
+/// scans the artifact set, finds every supersession pointer, and
+/// rewrites any target whose status is anything else.
+///
+/// Returns the number of fixes applied. Errors propagate via
+/// `Result` for I/O failures only - the schema check itself is
+/// silent (no warning when the supersession declaration is fine).
+///
+/// The supersedes value is parsed liberally: free-form annotations
+/// like `"ADR-001 (original, ESP32-S3 solo)"` are accepted - only
+/// the leading `<PREFIX>-<NUMBER>` token is used to look up the
+/// target. If the value doesn't start with a recognizable artifact
+/// ID, the entry is silently skipped.
+///
+/// Status `deprecated` is not overwritten - a deliberately
+/// deprecated artifact stays deprecated even if a newer one points
+/// at it via supersedes (this is a corner case but worth respecting).
+fn enforce_supersession_status(
+    artifacts: &mut [crate::artifact::Artifact],
+    schema: &Schema,
+) -> Result<usize> {
+    // Schema must have a `supersedes` field for this check to mean
+    // anything, AND a `status` field whose enum includes `superseded`.
+    let has_supersedes = schema.fields.iter().any(|f| f.name == "supersedes");
+    if !has_supersedes {
+        return Ok(0);
+    }
+    let status_accepts_superseded = schema
+        .fields
+        .iter()
+        .find(|f| f.name == "status")
+        .and_then(|f| f.values.as_ref())
+        .map(|values| values.iter().any(|v| v == "superseded"))
+        .unwrap_or(false);
+    if !status_accepts_superseded {
+        return Ok(0);
+    }
+
+    // Build an index from raw ID to (vector index) so we can mutate
+    // entries in place after the scan.
+    let mut by_id: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for (i, a) in artifacts.iter().enumerate() {
+        if let Some(id) = a.id() {
+            by_id.insert(id.to_string(), i);
+        }
+    }
+
+    // Collect (target_index, source_id) pairs to apply after the
+    // scan. Two-phase to avoid mutable borrow during iteration.
+    let mut to_fix: Vec<(usize, String)> = Vec::new();
+    for a in artifacts.iter() {
+        let supersedes_raw = match a.get_str("supersedes") {
+            Some(s) => s,
+            None => continue,
+        };
+        // Extract the leading ID token: split on whitespace or
+        // opening paren.
+        let target_id = supersedes_raw
+            .split(|c: char| c.is_whitespace() || c == '(')
+            .next()
+            .unwrap_or("")
+            .trim();
+        if target_id.is_empty() {
+            continue;
+        }
+        let target_idx = match by_id.get(target_id) {
+            Some(&i) => i,
+            None => continue, // Cross-project or unknown reference - skip
+        };
+        let target_status = artifacts[target_idx].status().unwrap_or("");
+        if target_status == "superseded" || target_status == "deprecated" {
+            continue;
+        }
+        let source_id = a.id().unwrap_or("?").to_string();
+        to_fix.push((target_idx, source_id));
+    }
+
+    if to_fix.is_empty() {
+        return Ok(0);
+    }
+
+    // Apply fixes.
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let mut applied = 0;
+    for (target_idx, source_id) in to_fix {
+        let target = &mut artifacts[target_idx];
+        let target_id = target.id().unwrap_or("?").to_string();
+        target.frontmatter.insert(
+            "status".into(),
+            serde_json::Value::String("superseded".into()),
+        );
+        target
+            .frontmatter
+            .insert("updated".into(), serde_json::Value::String(today.clone()));
+        let content = target.to_markdown();
+        std::fs::write(&target.path, &content).map_err(|e| {
+            anyhow::anyhow!(
+                "failed to write supersession-status fix to {}: {}",
+                target.path.display(),
+                e
+            )
+        })?;
+        eprintln!(
+            "  auto-fix: {} status -> superseded (declared by {} via supersedes:)",
+            target_id, source_id
+        );
+        applied += 1;
+    }
+
+    Ok(applied)
 }
 
 fn report_error(path: &Path, message: &str) {

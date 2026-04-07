@@ -344,6 +344,233 @@ fn test_lint_catches_invalid_enum() {
 }
 
 #[test]
+fn test_lint_auto_fixes_supersession_status_drift() {
+    // When ADR-002 declares `supersedes: ADR-001` in its frontmatter,
+    // ADR-001's status must be `superseded`. lint scans for the
+    // declaration and rewrites the target's status to match.
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let adr_schema = r#"name: adr
+directory: adr
+prefix: ADR
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [proposed, accepted, deprecated, superseded]
+    default: proposed
+  - name: date
+    type: date
+    required: true
+  - name: supersedes
+    type: string
+  - name: tags
+    type: list
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+template: |
+  ## Context
+
+  ## Decision
+
+  ## Consequences
+"#;
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("adr.yml"), adr_schema).unwrap();
+
+    let adr_dir = dir.path().join("adr");
+    fs::create_dir_all(&adr_dir).unwrap();
+
+    // ADR-001: status accepted (will be auto-flipped to superseded)
+    fs::write(
+        adr_dir.join("ADR-001-original-decision.md"),
+        "---\nid: ADR-001\ntitle: Original decision\nstatus: accepted\ndate: 2026-04-01\n---\n\nbody\n",
+    )
+    .unwrap();
+
+    // ADR-002: status accepted, supersedes ADR-001
+    fs::write(
+        adr_dir.join("ADR-002-revised-decision.md"),
+        "---\nid: ADR-002\ntitle: Revised decision\nstatus: accepted\ndate: 2026-04-08\nsupersedes: ADR-001\n---\n\nbody\n",
+    )
+    .unwrap();
+
+    // Run lint - should auto-fix ADR-001 and report it on stderr.
+    ark()
+        .args(["lint", "adr"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "ADR-001 status -> superseded (declared by ADR-002 via supersedes:)",
+        ));
+
+    // Verify on disk: ADR-001 status is now superseded.
+    let adr_001 = fs::read_to_string(adr_dir.join("ADR-001-original-decision.md")).unwrap();
+    assert!(
+        adr_001.contains("status: superseded"),
+        "ADR-001 should have been rewritten to status: superseded, got:\n{adr_001}"
+    );
+    assert!(
+        !adr_001.contains("status: accepted"),
+        "ADR-001 should no longer say accepted, got:\n{adr_001}"
+    );
+
+    // Re-running lint should be a no-op (idempotent) and produce no
+    // auto-fix lines on stderr.
+    ark()
+        .args(["lint", "adr"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("auto-fix:").not());
+}
+
+#[test]
+fn test_lint_auto_fix_skips_deprecated_target() {
+    // A target that's deliberately marked `deprecated` should NOT be
+    // overwritten to `superseded`. Deprecation is a stronger
+    // statement and we respect it.
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let adr_schema = r#"name: adr
+directory: adr
+prefix: ADR
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [proposed, accepted, deprecated, superseded]
+    default: proposed
+  - name: date
+    type: date
+    required: true
+  - name: supersedes
+    type: string
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("adr.yml"), adr_schema).unwrap();
+
+    let adr_dir = dir.path().join("adr");
+    fs::create_dir_all(&adr_dir).unwrap();
+
+    fs::write(
+        adr_dir.join("ADR-001-original.md"),
+        "---\nid: ADR-001\ntitle: Original\nstatus: deprecated\ndate: 2026-04-01\n---\n\nbody\n",
+    )
+    .unwrap();
+    fs::write(
+        adr_dir.join("ADR-002-revised.md"),
+        "---\nid: ADR-002\ntitle: Revised\nstatus: accepted\ndate: 2026-04-08\nsupersedes: ADR-001\n---\n\nbody\n",
+    )
+    .unwrap();
+
+    ark()
+        .args(["lint", "adr"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let adr_001 = fs::read_to_string(adr_dir.join("ADR-001-original.md")).unwrap();
+    assert!(
+        adr_001.contains("status: deprecated"),
+        "deprecated status should be preserved, got:\n{adr_001}"
+    );
+}
+
+#[test]
+fn test_lint_auto_fix_handles_freeform_supersedes_value() {
+    // The supersedes value can include free-form annotations like
+    // "ADR-001 (original, ESP32-S3 solo)". The leading ID token is
+    // extracted; the rest is ignored.
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let adr_schema = r#"name: adr
+directory: adr
+prefix: ADR
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [proposed, accepted, deprecated, superseded]
+    default: proposed
+  - name: date
+    type: date
+    required: true
+  - name: supersedes
+    type: string
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("adr.yml"), adr_schema).unwrap();
+
+    let adr_dir = dir.path().join("adr");
+    fs::create_dir_all(&adr_dir).unwrap();
+
+    fs::write(
+        adr_dir.join("ADR-001-original.md"),
+        "---\nid: ADR-001\ntitle: Original\nstatus: accepted\ndate: 2026-04-01\n---\n\nbody\n",
+    )
+    .unwrap();
+    fs::write(
+        adr_dir.join("ADR-002-revised.md"),
+        "---\nid: ADR-002\ntitle: Revised\nstatus: accepted\ndate: 2026-04-08\nsupersedes: ADR-001 (original, ESP32-S3 solo)\n---\n\nbody\n",
+    )
+    .unwrap();
+
+    ark()
+        .args(["lint", "adr"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let adr_001 = fs::read_to_string(adr_dir.join("ADR-001-original.md")).unwrap();
+    assert!(
+        adr_001.contains("status: superseded"),
+        "freeform supersedes annotation should still trigger the fix, got:\n{adr_001}"
+    );
+}
+
+#[test]
 fn test_archive_moves_done_items() {
     let dir = setup_project();
     ark()
