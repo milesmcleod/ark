@@ -72,12 +72,10 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
                 }
             }
             FieldType::List => {
-                // List values can't be set via --set as a single string
-                // (would need special parsing). Warn the user.
-                bail!(
-                    "field '{}' is a list type. Use --tags for tag lists, or edit the file directly for other list fields.",
-                    field_name
-                );
+                // List values are accepted as comma-separated strings.
+                // coerce_value splits them into a JSON array of strings.
+                // Individual items are not validated against per-item
+                // patterns in this version.
             }
         }
     } else {
@@ -91,7 +89,7 @@ pub fn validate_field_value(schema: &Schema, field_name: &str, value: &str) -> R
 }
 
 /// Convert a string value to the appropriate serde_json::Value based on schema field type.
-/// This ensures booleans are stored as booleans, integers as integers, etc.
+/// This ensures booleans are stored as booleans, integers as integers, list fields as arrays, etc.
 pub fn coerce_value(schema: &Schema, field_name: &str, value: &str) -> serde_json::Value {
     if let Some(field) = schema.get_field(field_name) {
         match field.field_type {
@@ -101,6 +99,19 @@ pub fn coerce_value(schema: &Schema, field_name: &str, value: &str) -> serde_jso
                 }
             }
             FieldType::Boolean => return serde_json::Value::Bool(value == "true"),
+            FieldType::List => {
+                // Split comma-separated input into a JSON array of strings.
+                // Empty segments and whitespace-only segments are filtered out.
+                // An empty value produces an empty array, which is valid for
+                // clearing a list field via `ark edit <id> --set field=`.
+                let items: Vec<serde_json::Value> = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| serde_json::Value::String(s.to_string()))
+                    .collect();
+                return serde_json::Value::Array(items);
+            }
             _ => {}
         }
     }

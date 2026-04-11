@@ -47,6 +47,26 @@ Feature: Write-time validation
     When I run `ark new <type> --set flag=true`
     Then the value is stored as a boolean true, not the string "true"
 
+  Scenario: List fields via --set are coerced from comma-separated strings
+    Given a schema with a list field named "aliases"
+    When I run `ark new <type> --title "Test" --set aliases="foo,bar,baz"`
+    Then the value is stored as a YAML array with three items: foo, bar, baz
+
+  Scenario: List field whitespace is trimmed and empty segments are dropped
+    Given a schema with a list field named "aliases"
+    When I run `ark new <type> --title "Test" --set aliases="foo , bar ,, baz"`
+    Then the value is stored as ["foo", "bar", "baz"] with no empty strings
+
+  Scenario: List fields can be cleared via --set with an empty value
+    Given an artifact with a non-empty list field
+    When I run `ark edit <id> --set aliases=`
+    Then the field is stored as an empty array
+
+  Scenario: List fields can be updated on edit via --set
+    Given an artifact BL-001 with aliases ["old"]
+    When I run `ark edit BL-001 --set aliases="new1,new2"`
+    Then the aliases field is replaced with ["new1", "new2"]
+
   # --- Derived field protection ---
 
   Scenario: Derived fields cannot be set via --set
@@ -83,6 +103,12 @@ Feature: Write-time validation
     When I run `ark edit BL-001 --status active --set status=done`
     Then the command fails with a "conflict" error
     Because the same field is being set by both a named flag and --set
+
+  Scenario: --tags and --set tags= for the same field is a conflict
+    Given a task schema with a tags list field
+    When I run `ark new task --title "Test" --project alpha --priority 10 --tags "a,b" --set tags="c,d"`
+    Then the command fails with a "conflict" error
+    Because tags can be set by either the named flag or --set but not both
 
   # --- Path traversal prevention ---
 

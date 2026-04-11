@@ -90,6 +90,7 @@ pub fn run(ark_root: &Path, args: &NewArgs) -> Result<()> {
             ("priority", args.priority.is_some()),
             ("project", args.project.is_some()),
             ("type", args.kind.is_some()),
+            ("tags", args.tags.is_some()),
         ];
         for (key, value) in extras {
             for (named_key, is_set) in named_fields {

@@ -2090,6 +2090,249 @@ fn test_set_conflict_detection() {
         .stderr(predicate::str::contains("conflict"));
 }
 
+// --- List field coercion via --set ---
+
+/// Sets up a project with a task schema that has both a tags list and
+/// a custom aliases list field, for testing list-field coercion.
+fn setup_project_with_list_field() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    ark().arg("init").current_dir(dir.path()).assert().success();
+
+    let schema = r#"name: task
+directory: backlog
+prefix: BL
+fields:
+  - name: id
+    type: string
+    required: true
+    derived: true
+  - name: title
+    type: string
+    required: true
+  - name: status
+    type: enum
+    required: true
+    values: [backlog, active, done]
+    default: backlog
+  - name: priority
+    type: integer
+    required: true
+    unique: true
+  - name: project
+    type: enum
+    required: true
+    values: [alpha, beta]
+  - name: tags
+    type: list
+  - name: aliases
+    type: list
+  - name: created
+    type: date
+    derived: true
+  - name: updated
+    type: date
+    derived: true
+"#;
+    let schemas_dir = dir.path().join(".ark").join("schemas");
+    fs::write(schemas_dir.join("task.yml"), schema).unwrap();
+    dir
+}
+
+#[test]
+fn test_new_set_list_field_basic() {
+    let dir = setup_project_with_list_field();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "aliases=foo,bar,baz",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(dir.path().join("backlog").join("BL-001-test.md")).unwrap();
+    assert!(
+        content.contains("aliases:"),
+        "aliases field missing from frontmatter:\n{}",
+        content
+    );
+    assert!(
+        content.contains("- foo") && content.contains("- bar") && content.contains("- baz"),
+        "expected list items in YAML array:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_new_set_list_field_trims_whitespace_and_drops_empty() {
+    let dir = setup_project_with_list_field();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "aliases=foo , bar ,, baz",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(dir.path().join("backlog").join("BL-001-test.md")).unwrap();
+    // After trim + filter: ["foo", "bar", "baz"]. No leading/trailing whitespace,
+    // no empty-string entries from the double comma.
+    assert!(content.contains("- foo"));
+    assert!(content.contains("- bar"));
+    assert!(content.contains("- baz"));
+    assert!(
+        !content.contains("- ''") && !content.contains("- \"\""),
+        "empty string leaked into array:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_edit_set_list_field_replaces_value() {
+    let dir = setup_project_with_list_field();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "aliases=old1,old2",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["edit", "BL-001", "--set", "aliases=new1,new2,new3"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(dir.path().join("backlog").join("BL-001-test.md")).unwrap();
+    assert!(content.contains("- new1"));
+    assert!(content.contains("- new2"));
+    assert!(content.contains("- new3"));
+    assert!(
+        !content.contains("- old1") && !content.contains("- old2"),
+        "old values persisted after replace:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_edit_set_list_field_empty_clears() {
+    let dir = setup_project_with_list_field();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "aliases=keep",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    ark()
+        .args(["edit", "BL-001", "--set", "aliases="])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(dir.path().join("backlog").join("BL-001-test.md")).unwrap();
+    assert!(
+        !content.contains("- keep"),
+        "old value persisted after clear:\n{}",
+        content
+    );
+    // Should serialize an empty array, either as `aliases: []` or omitted block.
+    assert!(
+        content.contains("aliases: []") || !content.contains("- "),
+        "aliases should be empty:\n{}",
+        content
+    );
+}
+
+#[test]
+fn test_new_set_tags_list_field_via_set() {
+    // --tags and --set tags= should both work individually. This test
+    // uses --set tags= instead of the named --tags flag to prove list
+    // coercion works for the tags field too.
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--set",
+            "tags=one,two",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(dir.path().join("backlog").join("BL-001-test.md")).unwrap();
+    assert!(content.contains("- one"));
+    assert!(content.contains("- two"));
+}
+
+#[test]
+fn test_new_tags_flag_and_set_tags_conflict() {
+    let dir = setup_project();
+    ark()
+        .args([
+            "new",
+            "task",
+            "--title",
+            "Test",
+            "--project",
+            "alpha",
+            "--priority",
+            "10",
+            "--tags",
+            "a,b",
+            "--set",
+            "tags=c,d",
+        ])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("conflict"));
+}
+
 // --- Registry pull tests ---
 
 #[test]
